@@ -1,0 +1,7 @@
+%{
+  "artificery": {:hex, :artificery, "0.2.6", "f602909757263f7897130cbd006b0e40514a541b148d366ad65b89236b93497a", [:mix], [], "hexpm"},
+  "bbmustache": {:hex, :bbmustache, "1.6.0", "7ac372aec621a69c369df237fbd9986caabcdd6341089fe5f42e5a7a4ac706b8", [:rebar3], [], "hexpm"},
+  "distillery": {:hex, :distillery, "2.0.9", "1e03e1bd97c0cd1187ce5882143fcc44812aa54d8c61b093801fab053bf07c98", [:mix], [{:artificery, "~> 0.2", [hex: :artificery, repo: "hexpm", optional: false]}], "hexpm"},
+  "grisp_tools": {:hex, :grisp_tools, "0.2.3", "f91d0c6ed2c56a5efd2ce5c8b47561df3e35767bb2002b3e73bf3a9fd0d21166", [:rebar3], [{:bbmustache, "~>1.6.0", [hex: :bbmustache, repo: "hexpm", optional: false]}, {:mapz, "~>0.3.0", [hex: :mapz, repo: "hexpm", optional: false]}], "hexpm"},
+  "mapz": {:hex, :mapz, "0.3.0", "438d24746ce5a252101e00b2032efdf7fc69eb32689d3b805de5e6dd7f52614f", [:rebar3], [], "hexpm"},
+}
