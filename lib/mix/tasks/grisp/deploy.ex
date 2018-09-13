@@ -185,14 +185,14 @@ defmodule Mix.Tasks.Grisp.Deploy do
     ], value)
   end
 
-  defp conf_release_update(config, :default, key, value) do
-    release_name = List.first(Map.keys(config.releases))
-    put_in(config, [
-      Access.key!(:releases),
-      release_name,
-      Access.key!(key)
-    ], value)
-  end
+  # defp conf_release_update(config, :default, key, value) do
+  #   release_name = List.first(Map.keys(config.releases))
+  #   put_in(config, [
+  #     Access.key!(:releases),
+  #     release_name,
+  #     Access.key!(key)
+  #   ], value)
+  # end
 
   defp apps() do
     old = Mix.env()
