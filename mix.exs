@@ -1,12 +1,12 @@
 defmodule MixGrisp.MixProject do
   use Mix.Project
 
-  @source_url "https://github.com/elixir-ecto/postgrex"
+  @source_url "https://github.com/grisp/mix_grisp"
 
   def project() do
     [
       app: :mix_grisp,
-      version: "0.1.0",
+      version: "0.1.1",
       description: "Mix plug-in for GRiSP.",
       elixir: "~> 1.7",
       start_permanent: Mix.env() == :prod,
