@@ -26,6 +26,7 @@ defmodule MixGrisp.MixProject do
     [
       {:grisp_tools, "~> 0.2"},
       {:distillery, "~> 2.0"},
+      {:ex_doc, ">= 0.0.0", only: :dev},
     ]
   end
 
