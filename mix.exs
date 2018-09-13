@@ -6,7 +6,7 @@ defmodule MixGrisp.MixProject do
   def project() do
     [
       app: :mix_grisp,
-      version: "0.1.1",
+      version: "0.1.2",
       description: "Mix plug-in for GRiSP.",
       elixir: "~> 1.7",
       start_permanent: Mix.env() == :prod,

@@ -211,7 +211,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
 
   defp header(message), do: Mix.shell.info(IO.ANSI.format([:blue, "===> ", message]))
   defp info(message),   do: Mix.shell.info(message)
-  defp warn(message),   do: Mix.shell.warn(message)
+  defp warn(message),   do: Mix.shell.info(IO.ANSI.format([:yellow, message]))
   defp fail!(message),  do: Mix.shell.fail!(message)
 
   defp debug(message, label: label) when is_binary(message) do
