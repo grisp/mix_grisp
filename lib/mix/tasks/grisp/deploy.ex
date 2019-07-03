@@ -146,7 +146,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
     name = :default
     env = :grisp
 
-    {:ok, config} = Mix.Releases.Config.get([
+    {:ok, config} = Distillery.Releases.Config.get([
       selected_release: name,
       selected_environment: env,
       executable: [enabled: false, transient: false],
@@ -160,13 +160,13 @@ defmodule Mix.Tasks.Grisp.Deploy do
       # |> conf_release_update(name, :applications, []) # Remove distillery apps
     # IO.inspect(config, label: "release_config")
     Code.ensure_loaded(Mix.Grisp.ReleasePlugin)
-    Mix.Releases.Shell.configure(:quiet)
-    release = case Mix.Releases.Assembler.assemble(config) do
+    Distillery.Releases.Shell.configure(:quiet)
+    release = case Distillery.Releases.Assembler.assemble(config) do
       {:ok, release} ->
         # IO.inspect(release, label: "release")
         release
       {:error, _} = err ->
-        fail!(Mix.Releases.Errors.format_error(err))
+        fail!(Distillery.Releases.Errors.format_error(err))
     end
     relspec = Map.merge(relspec, %{
       :dir => to_charlist(release.profile.output_dir),
