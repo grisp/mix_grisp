@@ -10,7 +10,7 @@ in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:mix_grisp, "~> 0.1.0", only: :dev}
+    {:mix_grisp, "~> 0.1.4", only: :dev}
   ]
 end
 ```
