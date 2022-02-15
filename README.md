@@ -10,7 +10,7 @@ in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:mix_grisp, "~> 0.1.4", only: :dev}
+    {:mix_grisp, "~> 0.2.0", only: :dev}
   ]
 end
 ```
@@ -36,8 +36,8 @@ Add the following dependencies in the project `mix.exs`:
         defp deps do
             [
                 ...
-                {:grisp, "~> 1.1"},
-                {:mix_grisp, "~> 0.1.0", only: :dev},
+                {:grisp, "~> 2.0"},
+                {:mix_grisp, "~> 0.2.0", only: :dev},
             ]
         end
     ```
@@ -51,15 +51,33 @@ Add the following configuration to your project:
         def project do
             [
                 ...
-                grisp: [
-                    otp: [verson: "21.0"],
-                    deploy: [
-                        # pre_script: "rm -rf /Volumes/GRISP/*",
-                        # destination: "/Volumes/GRISP",
-                        # post_script: "diskutil unmount /Volumes/GRISP",
-                    ]
-                ],
+                grisp: grisp(),
+                releases: releases()
             ]
+        end
+
+        def grisp do
+            [
+                otp: [verson: "23.0"],
+                deploy: [
+                    # pre_script: "rm -rf /Volumes/GRISP/*",
+                    # destination: "tmp/grisp"
+                    # post_script: "diskutil unmount /Volumes/GRISP",
+                ]
+            ]
+        end
+
+        def releases do
+            [
+                {:myapp,
+                    [
+                        overwrite: true,
+                        cookie: "grisp",
+                        include_erts: &MixGrisp.Release.erts/0,
+                        steps: [&MixGrisp.Release.init/1, :assemble],
+                        strip_beams: Mix.env() == :prod
+                    ]}
+                ]
         end
     ```
 
@@ -98,48 +116,19 @@ to the ssid and password of the WiFi network the Grisp board should connect to.
         }
         ```
 
-### Create Release
-
-Create the default release using mix template:
-
-    ```
-    $ mix distillery.init
-    ```
-
-Update the release configuration `rel/config.exs`:
-
- * Add a release configuration for grisp:
-
-    ```
-    environment :grisp do
-        set include_erts: true
-        set include_src: false
-        set cookie: :"SOME_COOKIE"
-    end
-    ```
-
- * Set the default environment to `grisp`:
-
-    ```
-    use Distillery.Releases.Config,
-        ...
-        default_environment: :grisp
-    ```
-
-
 ### Add Configuration
 
 If not generated bu Mix template, add the file `config/config.exs`:
 
     ```
-    use Mix.Config
+    import Config
     ```
 
 
 ### Check OTP Version
 
 Verify that your default erlang version matches the one configured
-(21 in the example).
+(23 in the example).
 
 This is required because the beam files are compiled locally and need to be
 compiled by the same version of the VM.

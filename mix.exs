@@ -6,13 +6,13 @@ defmodule MixGrisp.MixProject do
   def project() do
     [
       app: :mix_grisp,
-      version: "0.1.4",
+      version: "0.2.0",
       description: "Mix plug-in for GRiSP.",
-      elixir: "~> 1.7",
+      elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
-      source_url: @source_url,
+      source_url: @source_url
     ]
   end
 
@@ -24,9 +24,8 @@ defmodule MixGrisp.MixProject do
 
   defp deps() do
     [
-      {:grisp_tools, "~> 0.2"},
-      {:distillery, "~> 2.1.1"},
-      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:grisp_tools, "~> 2.1"},
+      {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 
@@ -36,9 +35,8 @@ defmodule MixGrisp.MixProject do
       licenses: ["Apache 2.0"],
       links: %{
         "GitHub" => @source_url,
-        "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md",
-      },
+        "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md"
+      }
     ]
   end
-
 end
