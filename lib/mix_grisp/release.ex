@@ -11,7 +11,6 @@ defmodule MixGrisp.Release do
   def init(release) do
     Process.get(:relspec)
     Process.put(:spec, Map.take(release, [:version, :path, :name]))
-
     release
   end
 end
