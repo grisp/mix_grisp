@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
   @moduledoc """
   Deploys a GRiSP application.
   """
-alias Mix.Project
+  alias Mix.Project
 
   use Mix.Task
   @recursive true
@@ -17,6 +17,7 @@ alias Mix.Project
     {:ok, _} = Application.ensure_all_started(:grisp_tools)
     config = Mix.Project.config()[:grisp]
     IO.inspect(config)
+
     try do
       :grisp_tools.deploy(%{
         project_root: to_charlist(File.cwd!()),
@@ -182,43 +183,56 @@ alias Mix.Project
     name = :default
     env = :grisp
 
-    {:ok, config} = Distillery.Releases.Config.get([
-      selected_release: name,
-      selected_environment: env,
-      executable: [enabled: false, transient: false],
-      is_upgrade: false,
-      no_tar: true,
-      upgrade_from: :latest
-    ])
+    {:ok, config} =
+      Distillery.Releases.Config.get(
+        selected_release: name,
+        selected_environment: env,
+        executable: [enabled: false, transient: false],
+        is_upgrade: false,
+        no_tar: true,
+        upgrade_from: :latest
+      )
+
     # TODO: Limit release apps to only deps (doesn't work with Distillery?)
-    config = config
+    config =
+      config
       |> conf_profile_update(env, :include_erts, to_string(erts))
-      # |> conf_release_update(name, :applications, []) # Remove distillery apps
+
+    # |> conf_release_update(name, :applications, []) # Remove distillery apps
     # IO.inspect(config, label: "release_config")
     Code.ensure_loaded(Mix.Grisp.ReleasePlugin)
-    Distillery.Releases.Shell.configure(:quiet)
-    release = case Distillery.Releases.Assembler.assemble(config) do
-      {:ok, release} ->
-        # IO.inspect(release, label: "release")
-        release
-      {:error, _} = err ->
-        fail!(Distillery.Releases.Errors.format_error(err))
-    end
-    relspec = Map.merge(relspec, %{
-      :dir => to_charlist(release.profile.output_dir),
-      :name => to_charlist(release.name),
-      :version => to_charlist(release.version)
-    })
+
+    release =
+      case Distillery.Releases.Assembler.assemble(config) do
+        {:ok, release} ->
+          # IO.inspect(release, label: "release")
+          release
+
+        {:error, _} = err ->
+          fail!(Distillery.Releases.Errors.format_error(err))
+      end
+
+    relspec =
+      Map.merge(relspec, %{
+        :dir => to_charlist(release.profile.output_dir),
+        :name => to_charlist(release.name),
+        :version => to_charlist(release.version)
+      })
+
     {relspec, state}
   end
 
   defp conf_profile_update(config, env, key, value) do
-    put_in(config, [
-      Access.key!(:environments),
-      env,
-      Access.key!(:profile),
-      Access.key!(key)
-    ], value)
+    put_in(
+      config,
+      [
+        Access.key!(:environments),
+        env,
+        Access.key!(:profile),
+        Access.key!(key)
+      ],
+      value
+    )
   end
 
   # defp conf_release_update(config, :default, key, value) do
@@ -237,7 +251,7 @@ alias Mix.Project
     Mix.env(:grisp)
     config = Mix.Project.config()
     app = {config[:app], %{dir: Mix.Project.app_path(), deps: Project.deps_apps()}}
-    {_, %{name: bottom}} =  Mix.ProjectStack.top_and_bottom()
+    {_, %{name: bottom}} = Mix.ProjectStack.top_and_bottom()
     {_, all_deps} = Mix.State.read_cache({:cached_deps, bottom})
 
     # IO.inspect(app)
@@ -246,9 +260,14 @@ alias Mix.Project
     all_apps =
       all_deps
       |> Enum.map(fn dep ->
-        sub_deps = for d <- dep.deps do d.app end
+        sub_deps =
+          for d <- dep.deps do
+            d.app
+          end
+
         {dep.app, %{dir: dep.opts[:build], deps: sub_deps}}
       end)
+
     # IO.inspect(all_apps)
     Mix.env(old)
     apps = all_apps ++ [app]
