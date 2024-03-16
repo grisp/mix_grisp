@@ -55,7 +55,7 @@ Add the following configuration to your project:
 
         def grisp do
             [
-                otp: [verson: "23.0"],
+                otp: [verson: "26.0.2"],
                 deploy: [
                     # pre_script: "rm -rf /Volumes/GRISP/*",
                     # destination: "tmp/grisp"
