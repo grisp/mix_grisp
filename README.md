@@ -72,6 +72,7 @@ Add the following configuration to your project:
                         cookie: "grisp",
                         include_erts: &MixGrisp.Release.erts/0,
                         steps: [&MixGrisp.Release.init/1, :assemble],
+                        include_executables_for: [],
                         strip_beams: Mix.env() == :prod
                     ]}
                 ]
