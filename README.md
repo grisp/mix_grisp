@@ -15,7 +15,6 @@ def deps do
 end
 ```
 
-
 ## New Project Step-By-Step
 
 ### Create New Project
@@ -26,7 +25,6 @@ Create a project using Elixir default project template:
     $ mix new testex --module TestEx
     $ cd testex
     ```
-
 
 ### Add Dependencies
 
@@ -41,7 +39,6 @@ Add the following dependencies in the project `mix.exs`:
             ]
         end
     ```
-
 
 ### Configure Grisp
 
@@ -89,14 +86,12 @@ Add the following boot configuration files after changing `GRISP_HOSTNAME` to
 the hostname you want the grisp board to have, `WLAN_SSID` and `WLAN_PASSWORD`
 to the ssid and password of the WiFi network the Grisp board should connect to.
 
-    * `grisp/grisp_base/files/grisp.ini.mustach`
+    * `grisp/grisp2/common/deploy/files/grisp.ini.mustache`
 
         ```
-        [boot]
-        image_path = /media/mmcsd-0-0/{{release_name}}/erts-{{erts_vsn}}/bin/beam.bin
-
         [erlang]
-        args = erl.rtems -- -mode embedded -home . -pa . -root {{release_name}} -boot {{release_name}}/releases/{{release_version}}/{{release_name}} -s elixir start_cli -noshell -user Elixir.IEx.CLI -extra --no-halt
+        args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -s elixir start_iex -extra --no-halt
+        shell = none
 
         [network]
         ip_self=dhcp
@@ -106,7 +101,7 @@ to the ssid and password of the WiFi network the Grisp board should connect to.
         ```
 
 
-    * `grisp/grisp_base/files/wpa_supplicant.conf`
+    * `grisp/grisp2/common/deploy/files/wpa_supplicant.conf`
 
         ```
         network={
@@ -124,7 +119,6 @@ If not generated bu Mix template, add the file `config/config.exs`:
     import Config
     ```
 
-
 ### Check OTP Version
 
 Verify that your default erlang version matches the one configured
@@ -132,7 +126,6 @@ Verify that your default erlang version matches the one configured
 
 This is required because the beam files are compiled locally and need to be
 compiled by the same version of the VM.
-
 
 ### Get Dependencies
 
@@ -142,7 +135,6 @@ Get all the dependencies:
     $ mix deps.get
     ```
 
-
 ### Deploy The Project
 
 To deploy, use the grisp command provided by `mix_grisp`:
@@ -151,7 +143,6 @@ To deploy, use the grisp command provided by `mix_grisp`:
     $ mix grisp.deploy
     ```
 
-
 ### Troubleshooting
 
 #### This BEAM file was compiled for a later version of the run-time system
@@ -159,6 +150,5 @@ To deploy, use the grisp command provided by `mix_grisp`:
 Some bema files were compiled with a newer version of OTP, delete `_build` and
 `deps`, get the fresh dependencies (`mix deps.get`), and redeploy
 (`mix grisp.deploy`).
-
 
 [grisp]: https://www.grisp.org

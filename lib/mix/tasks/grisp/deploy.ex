@@ -16,31 +16,45 @@ defmodule Mix.Tasks.Grisp.Deploy do
 
     {:ok, _} = Application.ensure_all_started(:grisp_tools)
     config = Mix.Project.config()[:grisp]
-    IO.inspect(config)
+
+    release_name = to_charlist(Project.config()[:app])
+    release_version = to_charlist(Project.config()[:version])
 
     try do
-      :grisp_tools.deploy(%{
+      %{
         project_root: to_charlist(File.cwd!()),
         otp_version_requirement: to_charlist(config[:otp][:version] || "23"),
-        platform: platform(config),
+        platform: Keyword.get(config, :platform, :grisp2),
         apps: apps(),
         custom_build: false,
         copy: %{
           force: false,
           destination: to_charlist(config[:deploy][:destination] || "tmp/grisp_sd")
         },
-        release: %{},
+        release: %{
+          name: release_name,
+          version: release_version
+        },
         handlers:
           :grisp_tools.handlers_init(%{
-            event: {&event_handler/2, %{}},
-            shell: {&shell_handler/3, nil},
+            event:
+              {&event_handler/2,
+               %{
+                 name: release_name,
+                 version: release_version
+               }},
+            shell: {&shell_handler/3, %{}},
             release: {&release_handler/2, nil}
           }),
         scripts: %{
           pre_script: config[:deploy][:pre_script] || :undefined,
           post_script: config[:deploy][:post_script] || :undefined
         }
-      })
+      }
+      |> :grisp_tools.deploy()
+      |> :grisp_tools.handlers_finalize()
+
+      info("Deployment done")
     catch
       :error, {:otp_version_mismatch, target, current} ->
         Mix.raise(
@@ -162,7 +176,6 @@ defmodule Mix.Tasks.Grisp.Deploy do
   end
 
   defp shell_handler(raw_cmd, opts, state) do
-    IO.inspect({raw_cmd, opts, state})
     cmd = raw_cmd |> IO.iodata_to_binary()
     debug(cmd, label: "cmd")
 
@@ -178,84 +191,36 @@ defmodule Mix.Tasks.Grisp.Deploy do
     {{:ok, result}, state}
   end
 
-  defp release_handler(%{erts: erts} = relspec, state) do
+  defp release_handler(relspec, state) do
     debug(relspec, label: "relspec")
-    name = :default
-    env = :grisp
+    Process.put(:relspec, relspec)
 
-    {:ok, config} =
-      Distillery.Releases.Config.get(
-        selected_release: name,
-        selected_environment: env,
-        executable: [enabled: false, transient: false],
-        is_upgrade: false,
-        no_tar: true,
-        upgrade_from: :latest
-      )
+    Mix.Task.run("release", [])
 
-    # TODO: Limit release apps to only deps (doesn't work with Distillery?)
-    config =
-      config
-      |> conf_profile_update(env, :include_erts, to_string(erts))
+    spec = Process.get(:spec)
 
-    # |> conf_release_update(name, :applications, []) # Remove distillery apps
-    # IO.inspect(config, label: "release_config")
-    Code.ensure_loaded(Mix.Grisp.ReleasePlugin)
+    Process.delete(:relspec)
+    Process.delete(:spec)
 
-    release =
-      case Distillery.Releases.Assembler.assemble(config) do
-        {:ok, release} ->
-          # IO.inspect(release, label: "release")
-          release
-
-        {:error, _} = err ->
-          fail!(Distillery.Releases.Errors.format_error(err))
-      end
-
-    relspec =
-      Map.merge(relspec, %{
-        :dir => to_charlist(release.profile.output_dir),
-        :name => to_charlist(release.name),
-        :version => to_charlist(release.version)
-      })
-
-    {relspec, state}
+    {%{
+       dir: spec.path |> String.to_charlist(),
+       name: spec.name |> to_charlist(),
+       version: spec.version |> String.to_charlist()
+     }, state}
   end
-
-  defp conf_profile_update(config, env, key, value) do
-    put_in(
-      config,
-      [
-        Access.key!(:environments),
-        env,
-        Access.key!(:profile),
-        Access.key!(key)
-      ],
-      value
-    )
-  end
-
-  # defp conf_release_update(config, :default, key, value) do
-  #   release_name = List.first(Map.keys(config.releases))
-  #   put_in(config, [
-  #     Access.key!(:releases),
-  #     release_name,
-  #     Access.key!(key)
-  #   ], value)
-  # end
 
   # gathering the apps and their deps to build the grisp overlay later
+  # since mix keeps dependency sources and their build output separate it is
+  # important to use the source paths here. These paths will be used by :grisp_tools
+  # to assemble the overlays
   @spec apps() :: [{Application.app(), %{dir: charlist(), deps: []}}]
   defp apps do
     old = Mix.env()
     Mix.env(:grisp)
-    config = Mix.Project.config()
-    app = {config[:app], %{dir: Mix.Project.app_path(), deps: Project.deps_apps()}}
+    config = Project.config()
+    app = {config[:app], %{dir: File.cwd!(), deps: Project.deps_apps()}}
     {_, %{name: bottom}} = Mix.ProjectStack.top_and_bottom()
     {_, all_deps} = Mix.State.read_cache({:cached_deps, bottom})
-
-    # IO.inspect(app)
-    # IO.inspect(all_deps)
 
     all_apps =
       all_deps
@@ -265,32 +230,11 @@ defmodule Mix.Tasks.Grisp.Deploy do
             d.app
           end
 
-        {dep.app, %{dir: dep.opts[:build], deps: sub_deps}}
+        {dep.app, %{dir: dep.opts[:dest], deps: sub_deps}}
       end)
 
-    # IO.inspect(all_apps)
     Mix.env(old)
-    apps = all_apps ++ [app]
-
-    IO.inspect(apps)
-    apps
-  end
-
-  defp platform(config) do
-    case Keyword.get(config, :platform) do
-      nil ->
-        case Keyword.get(config, :board) do
-          nil ->
-            :grisp2
-
-          board ->
-            Mix.shell().warn("Configuration key 'board' is deprecated, use 'platform' instead.")
-            board
-        end
-
-      platform ->
-        platform
-    end
+    all_apps ++ [app]
   end
 
   defp short(string), do: String.slice(to_string(string), 0..8)
@@ -301,9 +245,10 @@ defmodule Mix.Tasks.Grisp.Deploy do
   defp fail!(message), do: Mix.shell().fail!(message)
 
   defp debug(message, label: label) when is_binary(message) do
-    Mix.debug?() &&
+    if Mix.debug?() do
       IO.ANSI.format([:cyan, "mix_grisp[#{label}]: ", message])
       |> IO.puts()
+    end
   end
 
   defp debug(term, opts) do
