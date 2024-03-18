@@ -34,7 +34,7 @@ Add the following dependencies in the project `mix.exs`:
         defp deps do
             [
                 ...
-                {:grisp, "~> 2.0"},
+                {:grisp, "~> 2.4"},
                 {:mix_grisp, "~> 0.2.0", only: :dev},
             ]
         end
@@ -55,7 +55,7 @@ Add the following configuration to your project:
 
         def grisp do
             [
-                otp: [verson: "26.0.2"],
+                otp: [verson: "26"],
                 deploy: [
                     # pre_script: "rm -rf /Volumes/GRISP/*",
                     # destination: "tmp/grisp"
@@ -123,7 +123,7 @@ If not generated bu Mix template, add the file `config/config.exs`:
 ### Check OTP Version
 
 Verify that your default erlang version matches the one configured
-(23 in the example).
+(26 in the example).
 
 This is required because the beam files are compiled locally and need to be
 compiled by the same version of the VM.

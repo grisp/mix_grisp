@@ -8,7 +8,7 @@ defmodule MixGrisp.MixProject do
       app: :mix_grisp,
       version: "0.2.0",
       description: "Mix plug-in for GRiSP.",
-      elixir: "~> 1.9",
+      elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
@@ -24,7 +24,7 @@ defmodule MixGrisp.MixProject do
 
   defp deps() do
     [
-      {:grisp_tools, "~> 2.1"},
+      {:grisp_tools, "~> 2.5"},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end

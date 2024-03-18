@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
     try do
       %{
         project_root: to_charlist(File.cwd!()),
-        otp_version_requirement: to_charlist(config[:otp][:version] || "23"),
+        otp_version_requirement: to_charlist(config[:otp][:version] || "26"),
         platform: Keyword.get(config, :platform, :grisp2),
         apps: apps(),
         custom_build: false,
