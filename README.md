@@ -28,7 +28,7 @@ Create a project using Elixir default project template:
 
 ### Add Dependencies
 
-Add the following dependencies in the project `mix.exs`:
+Add the following dependencies in the project configuration `mix.exs`:
 
     ```
         defp deps do
@@ -42,7 +42,7 @@ Add the following dependencies in the project `mix.exs`:
 
 ### Configure Grisp
 
-Add the following configuration to your project:
+Add the following configuration to your project configuration `mix.exs`:
 
     ```
         def project do
