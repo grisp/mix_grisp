@@ -187,8 +187,11 @@ defmodule Mix.Tasks.Grisp.Deploy do
         for {k, v} <- env, do: {List.to_string(k), List.to_string(v)}
       end)
 
-    {result, 0} = System.cmd(cmd, args, opts)
-    {{:ok, result}, state}
+    {result, ret} = System.cmd(cmd, args, opts)
+    case ret do
+      0 -> {{:ok, result}, state}
+      _ -> Mix.raise("Error executing #{cmd} #{args}")
+    end
   end
 
   defp release_handler(relspec, state) do
