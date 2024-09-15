@@ -55,7 +55,7 @@ Add the following configuration to your project configuration `mix.exs`:
 
         def grisp do
             [
-                otp: [verson: "26"],
+                otp: [version: "27"],
                 deploy: [
                     # pre_script: "rm -rf /Volumes/GRISP/*",
                     # destination: "tmp/grisp"
