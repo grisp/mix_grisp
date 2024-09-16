@@ -24,7 +24,7 @@ defmodule MixGrisp.MixProject do
 
   defp deps() do
     [
-      {:grisp_tools, "~> 2.5"},
+      {:grisp_tools, "~> 2.7"},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
