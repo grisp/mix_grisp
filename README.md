@@ -153,3 +153,34 @@ Some bema files were compiled with a newer version of OTP, delete `_build` and
 (`mix grisp.deploy`).
 
 [grisp]: https://www.grisp.org
+
+
+## Enabling Erlang Distribution
+
+
+1. Add the erlang epmd to your release to be able to run Erlang distribution on GRiSP
+
+   1. Add the following line in your deps, this will ship epmd without starting it at boot.
+
+      ```elixir
+      {:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false},
+      ```
+
+   2. Add epmd to the included applications so its modules are loaded at runtime
+  
+      ```elixir
+       def application do
+        [
+          extra_applications: [:logger],
+          included_applications: [:epmd]
+        ]
+      end
+      ```
+
+2. Read the GRiSP.ini chapter of the [wiki](https://github.com/grisp/grisp/wiki/Connecting-over-WiFI-and-Ethernet#grisp-ini)
+
+3. Your grisp.ini.mustache file `args` should terminate with the following flags, choose a nodename and cookie of your liking.
+    ```
+    ... -s elixir start_iex -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname mynode -setcookie mycookie -extra --no-halt
+    ```
+
