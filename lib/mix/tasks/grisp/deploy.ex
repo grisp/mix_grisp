@@ -27,10 +27,16 @@ defmodule Mix.Tasks.Grisp.Deploy do
         platform: Keyword.get(config, :platform, :grisp2),
         apps: apps(),
         custom_build: false,
-        copy: %{
-          force: false,
-          destination: to_charlist(config[:deploy][:destination] || "tmp/grisp_sd")
-        },
+        distribute: [
+          {:copy, %{
+            type: :copy,
+            force: false,
+            destination: to_charlist(config[:deploy][:destination] || "tmp/grisp_sd"),
+            scripts: %{
+              pre_script: config[:deploy][:pre_script] || :undefined,
+              post_script: config[:deploy][:post_script] || :undefined}
+            }}
+        ],
         release: %{
           name: release_name,
           version: release_version
@@ -46,10 +52,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
             shell: {&shell_handler/3, %{}},
             release: {&release_handler/2, nil}
           }),
-        scripts: %{
-          pre_script: config[:deploy][:pre_script] || :undefined,
-          post_script: config[:deploy][:post_script] || :undefined
-        }
+
       }
       |> :grisp_tools.deploy()
       |> :grisp_tools.handlers_finalize()
@@ -187,8 +190,11 @@ defmodule Mix.Tasks.Grisp.Deploy do
         for {k, v} <- env, do: {List.to_string(k), List.to_string(v)}
       end)
 
-    {result, 0} = System.cmd(cmd, args, opts)
-    {{:ok, result}, state}
+    {result, ret} = System.cmd(cmd, args, opts)
+    case ret do
+      0 -> {{:ok, result}, state}
+      _ -> Mix.raise("Error executing #{cmd} #{args}")
+    end
   end
 
   defp release_handler(relspec, state) do
