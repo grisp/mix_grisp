@@ -1,186 +1,288 @@
-# GRiSP Mix plug-in
+# GRiSP Mix Plugin
 
-Mix plug-in to build and deploy GRiSP applications for the [GRiSP board][grisp].
+A Mix plugin for building and deploying Elixir applications to [GRiSP boards][grisp]. This tool simplifies the process of creating embedded applications that run on GRiSP hardware.
 
-## Summary
+## What is GRiSP?
 
-The package can be installed by adding `mix_grisp` to your list of dependencies
-in `mix.exs`:
+[GRiSP][grisp] is a development board that runs Erlang/Elixir applications on bare metal using RTEMS (Real-Time Executive for Multiprocessor Systems). It's perfect for IoT projects, embedded systems, and real-time applications.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- **Elixir 1.14+** and **Erlang/OTP 27+** installed
+- **Mix** (comes with Elixir)
+- A **GRiSP board** and **SD card** for deployment
+- Basic familiarity with Elixir and Mix
+
+## Quick Start
+
+### 1. Create a New Project
+
+```bash
+mix new my_grisp_app --module MyGrispApp
+cd my_grisp_app
+```
+
+### 2. Add Dependencies
+
+Add the required dependencies to your `mix.exs`:
 
 ```elixir
 def deps do
   [
+    {:grisp, "~> 2.4"},
     {:mix_grisp, "~> 0.2.0", only: :dev}
   ]
 end
 ```
 
-## New Project Step-By-Step
+### 3. Configure Your Project
 
-### Create New Project
+Update your `mix.exs` with the GRiSP configuration:
 
-Create a project using Elixir default project template:
+```elixir
+def project do
+  [
+    app: :my_grisp_app,
+    version: "0.1.0",
+    elixir: "~> 1.14",
+    start_permanent: Mix.env() == :prod,
+    deps: deps(),
+    grisp: grisp(),
+    releases: releases()
+  ]
+end
 
-    ```
-    $ mix new testex --module TestEx
-    $ cd testex
-    ```
+defp deps do
+  [
+    {:grisp, "~> 2.4"},
+    {:mix_grisp, "~> 0.2.0", only: :dev}
+  ]
+end
 
-### Add Dependencies
+def grisp do
+  [
+    otp: [version: "27"],
+    deploy: [
+      # Uncomment and configure these for direct SD card deployment:
+      # pre_script: "rm -rf /Volumes/GRISP/*",
+      # destination: "tmp/grisp"
+      # post_script: "diskutil unmount /Volumes/GRISP",
+    ]
+  ]
+end
 
-Add the following dependencies in the project configuration `mix.exs`:
+def releases do
+  [
+    my_grisp_app: [
+      overwrite: true,
+      cookie: "grisp",
+      include_erts: &MixGrisp.Release.erts/0,
+      steps: [&MixGrisp.Release.init/1, :assemble],
+      include_executables_for: [],
+      strip_beams: Mix.env() == :prod
+    ]
+  ]
+end
+```
 
-    ```
-        defp deps do
-            [
-                ...
-                {:grisp, "~> 2.4"},
-                {:mix_grisp, "~> 0.2.0", only: :dev},
-            ]
-        end
-    ```
+### 4. Create Configuration Files
 
-### Configure Grisp
+Create the required configuration files for your GRiSP board:
 
-Add the following configuration to your project configuration `mix.exs`:
+#### Network Configuration
 
-    ```
-        def project do
-            [
-                ...
-                grisp: grisp(),
-                releases: releases()
-            ]
-        end
+Create `grisp/grisp2/common/deploy/files/grisp.ini.mustache`:
 
-        def grisp do
-            [
-                otp: [version: "27"],
-                deploy: [
-                    # pre_script: "rm -rf /Volumes/GRISP/*",
-                    # destination: "tmp/grisp"
-                    # post_script: "diskutil unmount /Volumes/GRISP",
-                ]
-            ]
-        end
+```ini
+[erlang]
+args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -user elixir -run elixir start_cli -kernel inetrc "./erl_inetrc" -extra --no-halt
+shell = none
 
-        def releases do
-            [
-                {:myapp,
-                    [
-                        overwrite: true,
-                        cookie: "grisp",
-                        include_erts: &MixGrisp.Release.erts/0,
-                        steps: [&MixGrisp.Release.init/1, :assemble],
-                        include_executables_for: [],
-                        strip_beams: Mix.env() == :prod
-                    ]}
-                ]
-        end
-    ```
+[network]
+ip_self=dhcp
+wlan=enable
+hostname=my-grisp-board
+wpa=wpa_supplicant.conf
+```
 
-You can uncomment the lines in the `deploy` list after setting the proper mount
-point for your SD card if you want to deploy directly to it. The destination can be
-a normal path if you want to deploy to a local directory.
+Create `grisp/grisp2/common/deploy/files/wpa_supplicant.conf`:
 
-Add the following boot configuration files after changing `GRISP_HOSTNAME` to
-the hostname you want the grisp board to have, `WLAN_SSID` and `WLAN_PASSWORD`
-to the ssid and password of the WiFi network the Grisp board should connect to.
+```conf
+network={
+    ssid="YOUR_WIFI_SSID"
+    key_mgmt=WPA-PSK
+    psk="YOUR_WIFI_PASSWORD"
+}
+```
 
-    * `grisp/grisp2/common/deploy/files/grisp.ini.mustache`
+**Important:** Replace `YOUR_WIFI_SSID` and `YOUR_WIFI_PASSWORD` with your actual WiFi credentials, and change `my-grisp-board` to your desired hostname.
 
-        ```
-        [erlang]
-        args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -s elixir start_iex -extra --no-halt
-        shell = none
+### 5. Install Dependencies
 
-        [network]
-        ip_self=dhcp
-        wlan=enable
-        hostname=GRISP_HOSTNAME
-        wpa=wpa_supplicant.conf
-        ```
+```bash
+mix deps.get
+```
 
+### 6. Deploy to GRiSP
 
-    * `grisp/grisp2/common/deploy/files/wpa_supplicant.conf`
+```bash
+mix grisp.deploy
+```
 
-        ```
-        network={
-            ssid="WLAN_SSID"
-            key_mgmt=WPA-PSK
-            psk="WLAN_PASSWORD"
-        }
-        ```
+## Configuration Explained
 
-### Add Configuration
+### GRiSP Configuration
 
-If not generated bu Mix template, add the file `config/config.exs`:
+The `grisp()` function in your `mix.exs` configures:
 
-    ```
-    import Config
-    ```
+- **OTP Version**: Must match your local Erlang version (check with `erl -eval 'io:format("~s~n", [erlang:system_info(otp_release)]), halt().'`)
+- **Deploy Options**: 
+  - `pre_script`: Commands to run before deployment (e.g., clearing SD card)
+  - `destination`: Where to deploy (local path or SD card mount point)
+  - `post_script`: Commands to run after deployment (e.g., unmounting SD card)
 
-### Check OTP Version
+### Release Configuration
 
-Verify that your default erlang version matches the one configured
-(26 in the example).
+The `releases()` function configures how your application is packaged:
 
-This is required because the beam files are compiled locally and need to be
-compiled by the same version of the VM.
+- **Cookie**: Used for Erlang distribution (keep as "grisp" unless you need custom distribution)
+- **Include ERTS**: Includes the Erlang runtime system
+- **Steps**: Custom build steps for GRiSP compatibility
 
-### Get Dependencies
+## Deployment Options
 
-Get all the dependencies:
+### Local Development
+For testing, deploy to a local directory:
 
-    ```
-    $ mix deps.get
-    ```
+```elixir
+def grisp do
+  [
+    otp: [version: "27"],
+    deploy: [
+      destination: "tmp/grisp"
+    ]
+  ]
+end
+```
 
-### Deploy The Project
+### Direct to SD Card
+For production deployment, configure your SD card mount point:
 
-To deploy, use the grisp command provided by `mix_grisp`:
+```elixir
+def grisp do
+  [
+    otp: [version: "27"],
+    deploy: [
+      pre_script: "rm -rf /Volumes/GRISP/*",
+      destination: "/Volumes/GRISP",
+      post_script: "diskutil unmount /Volumes/GRISP"
+    ]
+  ]
+end
+```
 
-    ```
-    $ mix grisp.deploy
-    ```
-
-### Troubleshooting
-
-#### This BEAM file was compiled for a later version of the run-time system
-
-Some bema files were compiled with a newer version of OTP, delete `_build` and
-`deps`, get the fresh dependencies (`mix deps.get`), and redeploy
-(`mix grisp.deploy`).
-
-[grisp]: https://www.grisp.org
-
+**Note:** Adjust the mount point (`/Volumes/GRISP`) to match your system.
 
 ## Enabling Erlang Distribution
 
+To enable distributed Erlang on your GRiSP board:
 
-1. Add the erlang epmd to your release to be able to run Erlang distribution on GRiSP
+### 1. Add EPMD Dependency
 
-   1. Add the following line in your deps, this will ship epmd without starting it at boot.
+```elixir
+def deps do
+  [
+    {:grisp, "~> 2.4"},
+    {:mix_grisp, "~> 0.2.0", only: :dev},
+    {:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false}
+  ]
+end
+```
 
-      ```elixir
-      {:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false},
-      ```
+### 2. Include EPMD in Your Application
 
-   2. Add epmd to the included applications so its modules are loaded at runtime
-  
-      ```elixir
-       def application do
-        [
-          extra_applications: [:logger],
-          included_applications: [:epmd]
-        ]
-      end
-      ```
+```elixir
+def application do
+  [
+    extra_applications: [:logger],
+    included_applications: [:epmd]
+  ]
+end
+```
 
-2. Read the GRiSP.ini chapter of the [wiki](https://github.com/grisp/grisp/wiki/Connecting-over-WiFI-and-Ethernet#grisp-ini)
+### 3. Update GRiSP Configuration
 
-3. Your grisp.ini.mustache file `args` should terminate with the following flags, choose a nodename and cookie of your liking.
-    ```
-    ... -s elixir start_iex -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname mynode -setcookie mycookie -extra --no-halt
-    ```
+Modify your `grisp.ini.mustache` to include distribution flags. Your `args` should terminate with the following flags, choose a nodename and cookie of your liking:
+
+```ini
+[erlang]
+args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -s elixir start_iex -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname mynode -setcookie mycookie -extra --no-halt
+shell = none
+```
+
+**Note:** Replace `mynode` with your desired node name and `mycookie` with your desired cookie.
+
+## Troubleshooting
+
+### Common Issues
+
+#### BEAM File Version Mismatch
+**Error:** "This BEAM file was compiled for a later version of the run-time system"
+
+**Solution:** Clean and rebuild:
+```bash
+rm -rf _build deps
+mix deps.get
+mix grisp.deploy
+```
+
+#### OTP Version Mismatch
+**Error:** Deployment fails with version-related errors
+
+**Solution:** Ensure your local Erlang version matches the configured version:
+```bash
+erl -eval 'io:format("~s~n", [erlang:system_info(otp_release)]), halt().'
+```
+
+Update the `otp: [version: "XX"]` in your `grisp()` configuration to match.
+
+#### SD Card Not Found
+**Error:** Deployment fails when trying to write to SD card
+
+**Solution:** 
+1. Check your SD card mount point
+2. Ensure the card is properly mounted
+3. Verify write permissions
+
+#### WiFi Connection Issues
+**Error:** GRiSP board doesn't connect to WiFi
+
+**Solution:**
+1. Verify SSID and password in `wpa_supplicant.conf`
+2. Check WiFi network compatibility (WPA-PSK)
+3. Ensure the network is in range
+
+### Getting Help
+
+- Check the [GRiSP documentation][grisp]
+- Review the [GRiSP wiki](https://github.com/grisp/grisp/wiki)
+- Ensure your Erlang/Elixir versions are compatible
+
+## What's Next?
+
+After successful deployment:
+
+1. **Monitor your application** using the GRiSP console
+2. **Connect via WiFi** using the configured hostname
+3. **Develop your application** by adding modules to `lib/`
+4. **Test Erlang distribution** if enabled
+5. **Deploy updates** using `mix grisp.deploy`
+
+## Contributing
+
+Found an issue or have a suggestion? Please [open an issue](https://github.com/grisp/mix_grisp/issues) or submit a pull request.
+
+[grisp]: https://www.grisp.org
 
