@@ -17,7 +17,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
     {:ok, _} = Application.ensure_all_started(:grisp_tools)
     config = Mix.Project.config()[:grisp]
 
-    release_name = to_charlist(Project.config()[:app])
+    release_name = Project.config()[:app]
     release_version = to_charlist(Project.config()[:version])
 
     try do
@@ -210,7 +210,7 @@ defmodule Mix.Tasks.Grisp.Deploy do
 
     {%{
        dir: spec.path |> String.to_charlist(),
-       name: spec.name |> to_charlist(),
+       name: spec.name,
        version: spec.version |> String.to_charlist()
      }, state}
   end
