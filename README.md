@@ -10,7 +10,7 @@ A Mix plugin for building and deploying Elixir applications to [GRiSP boards][gr
 
 Before you begin, make sure you have:
 
-- **Elixir 1.14+** and **Erlang/OTP 27+** installed
+- **Elixir 1.17+** and **Erlang/OTP 27+** installed
 - **Mix** (comes with Elixir)
 - A **GRiSP board** and **SD card** for deployment
 - Basic familiarity with Elixir and Mix
@@ -31,7 +31,7 @@ Add the required dependencies to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:grisp, "~> 2.4"},
+    {:grisp, "~> 2.9"},
     {:mix_grisp, "~> 0.2.0", only: :dev}
   ]
 end
@@ -56,7 +56,7 @@ end
 
 defp deps do
   [
-    {:grisp, "~> 2.4"},
+    {:grisp, "~> 2.9"},
     {:mix_grisp, "~> 0.2.0", only: :dev}
   ]
 end
@@ -97,7 +97,7 @@ Create `grisp/grisp2/common/deploy/files/grisp.ini.mustache`:
 
 ```ini
 [erlang]
-args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -user elixir -run elixir start_cli -kernel inetrc "./erl_inetrc" -extra --no-halt
+args = erl.rtems -C multi_time_warp -fnu -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -user elixir -run elixir start_cli -extra --no-halt
 shell = none
 
 [network]
@@ -194,7 +194,7 @@ To enable distributed Erlang on your GRiSP board:
 ```elixir
 def deps do
   [
-    {:grisp, "~> 2.4"},
+    {:grisp, "~> 2.9"},
     {:mix_grisp, "~> 0.2.0", only: :dev},
     {:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false}
   ]
@@ -218,7 +218,7 @@ Modify your `grisp.ini.mustache` to include distribution flags. Your `args` shou
 
 ```ini
 [erlang]
-args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -s elixir start_iex -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname mynode -setcookie mycookie -extra --no-halt
+args = erl.rtems -C multi_time_warp -fnu -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -user elixir -run elixir start_cli -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname grisp -setcookie grisp -extra --no-halt
 shell = none
 ```
 
