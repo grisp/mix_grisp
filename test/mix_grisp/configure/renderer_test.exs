@@ -108,4 +108,30 @@ defmodule MixGrisp.Configure.RendererTest do
     refute grisp_ini =~ "wpa=wpa_supplicant.conf"
     refute File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/wpa_supplicant.conf"))
   end
+
+  test "renderer adds epmd flags to grisp.ini when epmd is enabled", %{root: root} do
+    config =
+      Configure.defaults()
+      |> Map.merge(%{
+        name: "demo",
+        network: true,
+        network_type: "ethernet",
+        epmd: true,
+        node_name: "mynode",
+        cookie: "mycookie"
+      })
+
+    plan = TemplatePlan.build(config)
+    Renderer.apply(plan, config, root: root)
+
+    grisp_ini =
+      root
+      |> Path.join("grisp/grisp2/common/deploy/files/grisp.ini.mustache")
+      |> File.read!()
+
+    assert grisp_ini =~ ~s(-kernel inetrc "./erl_inetrc")
+    assert grisp_ini =~ "-internal_epmd epmd_sup"
+    assert grisp_ini =~ "-sname mynode"
+    assert grisp_ini =~ "-setcookie mycookie"
+  end
 end

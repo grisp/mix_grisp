@@ -22,6 +22,7 @@ defmodule Mix.Tasks.Grisp.Configure do
     grisp_io_linking: :string,
     token: :string,
     epmd: :string,
+    node_name: :string,
     cookie: :string
   ]
 
@@ -31,7 +32,7 @@ defmodule Mix.Tasks.Grisp.Configure do
     # If interactive mode grows, this task may need a friendlier error boundary.
     fail_on_invalid!(invalid)
 
-    %{result: result} = Configure.run(opts)
+    %{result: result, patch_result: patch_result} = Configure.run(opts)
 
     Enum.each(Enum.reverse(result.created), fn path ->
       Mix.shell().info("Created #{path}")
@@ -40,6 +41,8 @@ defmodule Mix.Tasks.Grisp.Configure do
     Enum.each(Enum.reverse(result.skipped), fn path ->
       Mix.shell().info("Skipped #{path}")
     end)
+
+    print_patch_result(patch_result)
   end
 
   defp fail_on_invalid!([]), do: :ok
@@ -55,4 +58,28 @@ defmodule Mix.Tasks.Grisp.Configure do
   defp format_invalid_option({<<"--", option::binary>>, value}), do: format_invalid_option({option, value})
   defp format_invalid_option({option, nil}), do: "--#{option}"
   defp format_invalid_option({option, value}), do: "--#{option}=#{value}"
+
+  defp print_patch_result(%{status: :updated, updated: paths, manual: manual}) do
+    Enum.each(paths, fn path ->
+      Mix.shell().info("Updated #{path}")
+    end)
+
+    Enum.each(manual, fn step ->
+      Mix.shell().info("Manual step:\n#{step}")
+    end)
+  end
+
+  defp print_patch_result(%{status: :unchanged, manual: manual}) do
+    Enum.each(manual, fn step ->
+      Mix.shell().info("Manual step:\n#{step}")
+    end)
+  end
+
+  defp print_patch_result(%{status: :manual, manual: manual}) do
+    Mix.shell().info("Could not safely update mix.exs automatically.")
+
+    Enum.each(manual, fn step ->
+      Mix.shell().info("Manual step:\n#{step}")
+    end)
+  end
 end

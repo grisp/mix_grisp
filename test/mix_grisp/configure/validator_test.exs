@@ -22,6 +22,7 @@ defmodule MixGrisp.Configure.ValidatorTest do
              grisp_io_linking: false,
              token: nil,
              epmd: false,
+             node_name: nil,
              cookie: nil
            } = Configure.defaults()
   end
@@ -130,6 +131,20 @@ defmodule MixGrisp.Configure.ValidatorTest do
     end
   end
 
+  test "validator rejects node_name without epmd" do
+    assert_raise Mix.Error, "--node-name requires --epmd", fn ->
+      %{base_config() | node_name: "mynode"}
+      |> Validator.validate!()
+    end
+  end
+
+  test "validator requires node_name when epmd is enabled" do
+    assert_raise Mix.Error, "--node-name is required when --epmd is enabled", fn ->
+      %{base_config() | epmd: true}
+      |> Validator.validate!()
+    end
+  end
+
   test "validator accepts a valid config" do
     config =
       Configure.defaults()
@@ -143,6 +158,7 @@ defmodule MixGrisp.Configure.ValidatorTest do
         grisp_io_linking: true,
         token: "token",
         epmd: true,
+        node_name: "mynode",
         cookie: "grisp"
       })
       |> Validator.validate!()
@@ -166,6 +182,7 @@ defmodule MixGrisp.Configure.ValidatorTest do
 
     assert config.token == nil
     assert config.cookie == nil
+    assert config.node_name == nil
     assert config.destination == nil
   end
 end

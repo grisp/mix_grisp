@@ -37,6 +37,7 @@ defmodule Mix.Tasks.Grisp.ConfigureTest do
     assert_received {:mix_shell, :info, ["Created grisp/grisp2/common/deploy/files/grisp.ini.mustache"]}
     assert_received {:mix_shell, :info, ["Created grisp/grisp2/common/deploy/files/wpa_supplicant.conf"]}
     assert_received {:mix_shell, :info, ["Created grisp/grisp2/common/deploy/files/erl_inetrc"]}
+    assert_received {:mix_shell, :info, ["Could not safely update mix.exs automatically."]}
 
     assert File.exists?(Path.join(root, "config/config.exs"))
     assert File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/grisp.ini.mustache"))
@@ -154,5 +155,112 @@ defmodule Mix.Tasks.Grisp.ConfigureTest do
         ])
       end)
     end
+  end
+
+  test "configure updates a simple mix.exs automatically", %{root: root} do
+    File.write!(Path.join(root, "mix.exs"), """
+    defmodule Demo.MixProject do
+      use Mix.Project
+
+      def project do
+        [
+          app: :demo,
+          version: "0.1.0",
+          deps: deps()
+        ]
+      end
+
+      def application do
+        [
+          extra_applications: [:logger]
+        ]
+      end
+
+      defp deps do
+        []
+      end
+    end
+    """)
+
+    File.cd!(root, fn ->
+      Mix.Tasks.Grisp.Configure.run([
+        "--interactive",
+        "false",
+        "--name",
+        "demo",
+        "--network",
+        "true",
+        "--epmd",
+        "true",
+        "--node-name",
+        "mynode",
+        "--cookie",
+        "grisp"
+      ])
+    end)
+
+    patched = File.read!(Path.join(root, "mix.exs"))
+
+    assert_received {:mix_shell, :info, ["Updated mix.exs"]}
+    assert patched =~ "grisp: grisp()"
+    assert patched =~ "releases: releases()"
+    assert patched =~ ~s({:grisp, "~> 2.4"})
+    assert patched =~ ~s({:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false})
+    assert patched =~ "included_applications: [:epmd]"
+  end
+
+  test "fixture-like non-interactive epmd setup updates mix.exs and grisp.ini", %{root: root} do
+    File.write!(Path.join(root, "mix.exs"), """
+    defmodule Demo.MixProject do
+      use Mix.Project
+
+      def project do
+        [
+          app: :demo,
+          version: "0.1.0",
+          deps: deps()
+        ]
+      end
+
+      def application do
+        [
+          extra_applications: [:logger]
+        ]
+      end
+
+      defp deps do
+        []
+      end
+    end
+    """)
+
+    File.cd!(root, fn ->
+      Mix.Tasks.Grisp.Configure.run([
+        "--interactive",
+        "false",
+        "--name",
+        "demo",
+        "--network",
+        "true",
+        "--network-type",
+        "ethernet",
+        "--epmd",
+        "true",
+        "--node-name",
+        "mynode",
+        "--cookie",
+        "mycookie"
+      ])
+    end)
+
+    patched = File.read!(Path.join(root, "mix.exs"))
+    grisp_ini = File.read!(Path.join(root, "grisp/grisp2/common/deploy/files/grisp.ini.mustache"))
+
+    assert patched =~ ~s({:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false})
+    assert patched =~ "included_applications: [:epmd]"
+    assert grisp_ini =~ ~s(-kernel inetrc "./erl_inetrc")
+    assert grisp_ini =~ "-internal_epmd epmd_sup"
+    assert grisp_ini =~ "-sname mynode"
+    assert grisp_ini =~ "-setcookie mycookie"
   end
 end

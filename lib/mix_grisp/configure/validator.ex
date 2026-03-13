@@ -1,7 +1,7 @@
 defmodule MixGrisp.Configure.Validator do
   @moduledoc false
 
-  @optional_string_keys [:destination, :network_type, :ssid, :psk, :token, :cookie]
+  @optional_string_keys [:destination, :network_type, :ssid, :psk, :token, :node_name, :cookie]
 
   def normalize(config) when is_map(config) do
     Enum.reduce(@optional_string_keys, config, fn key, acc ->
@@ -40,6 +40,12 @@ defmodule MixGrisp.Configure.Validator do
 
       present?(config.cookie) && !config.epmd ->
         Mix.raise("--cookie requires --epmd")
+
+      present?(config.node_name) && !config.epmd ->
+        Mix.raise("--node-name requires --epmd")
+
+      config.epmd && !present?(config.node_name) ->
+        Mix.raise("--node-name is required when --epmd is enabled")
 
       true ->
         config

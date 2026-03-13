@@ -27,11 +27,13 @@ defmodule MixGrisp.Configure.Renderer do
 
   defp template_contents("grisp/grisp2/common/deploy/files/grisp.ini.mustache" = template, config) do
     # Keep the base GRiSP.ini canonical and add the Wi-Fi-specific `wpa=` line only
-    # when the user selected Wi-Fi networking.
+    # when the user selected Wi-Fi networking. Likewise, append the epmd/distribution
+    # flags only when that feature is enabled.
     template
     |> template_path()
     |> File.read!()
     |> maybe_add_wpa_line(config)
+    |> maybe_add_epmd_flags(config)
   end
 
   defp template_contents(template, _config) do
@@ -61,4 +63,13 @@ defmodule MixGrisp.Configure.Renderer do
   end
 
   defp maybe_add_wpa_line(contents, _config), do: contents
+
+  defp maybe_add_epmd_flags(contents, %{epmd: true, node_name: node_name, cookie: cookie}) do
+    flags =
+      ~s( -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname #{node_name} -setcookie #{cookie || "grisp"})
+
+    String.replace(contents, " -extra --no-halt", flags <> " -extra --no-halt")
+  end
+
+  defp maybe_add_epmd_flags(contents, _config), do: contents
 end

@@ -19,6 +19,7 @@ defmodule MixGrisp.Configure.Prompter do
     |> maybe_prompt_grisp_io_linking(ask)
     |> maybe_prompt_token(ask)
     |> maybe_prompt_epmd(ask)
+    |> maybe_prompt_node_name(ask)
     |> maybe_prompt_cookie(ask)
   end
 
@@ -75,6 +76,12 @@ defmodule MixGrisp.Configure.Prompter do
   end
 
   defp maybe_prompt_epmd(config, _ask), do: config
+
+  defp maybe_prompt_node_name(%{epmd: true, node_name: nil} = config, ask) do
+    Map.put(config, :node_name, ask_string(ask, "Erlang distribution node name"))
+  end
+
+  defp maybe_prompt_node_name(config, _ask), do: config
 
   defp maybe_prompt_cookie(%{epmd: true, cookie: nil} = config, ask) do
     Map.put(config, :cookie, ask_optional_string(ask, "Erlang distribution cookie"))
