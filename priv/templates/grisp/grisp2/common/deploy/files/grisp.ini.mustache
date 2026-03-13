@@ -1,0 +1,9 @@
+[erlang]
+args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -s elixir start_iex -extra --no-halt
+shell = none
+
+[network]
+ip_self=dhcp
+wlan=enable
+hostname=GRISP_HOSTNAME
+wpa=wpa_supplicant.conf
