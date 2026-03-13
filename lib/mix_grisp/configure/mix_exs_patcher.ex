@@ -1,6 +1,8 @@
 defmodule MixGrisp.Configure.MixExsPatcher do
   @moduledoc false
 
+  alias MixGrisp.Configure.Snippets
+
   @project_regex ~r/def project(?:\(\))? do\s*\[(?<body>.*?)\]/ms
   @deps_regex ~r/defp deps(?:\(\))? do\s*\[(?<body>.*?)\]/ms
   @application_regex ~r/def application(?:\(\))? do\s*\[(?<body>.*?)\]/ms
@@ -104,7 +106,7 @@ defmodule MixGrisp.Configure.MixExsPatcher do
   end
 
   defp maybe_ensure_epmd_dep(body, %{epmd: true}) do
-    ensure_dep(body, ~s({:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false}))
+    ensure_dep(body, Snippets.epmd_dependency())
   end
 
   defp maybe_ensure_epmd_dep(body, _config), do: body
@@ -135,38 +137,9 @@ defmodule MixGrisp.Configure.MixExsPatcher do
     end
   end
 
-  defp grisp_snippet(config) do
-    """
-      def grisp do
-        [
-          otp: [version: "#{config.otp_version}"],
-          deploy: [
-            # pre_script: "rm -rf /Volumes/GRISP/*",
-            # destination: "tmp/grisp"
-            # post_script: "diskutil unmount /Volumes/GRISP",
-          ]
-        ]
-      end
-    """
-  end
+  defp grisp_snippet(config), do: Snippets.grisp_function(config)
 
-  defp releases_snippet(config) do
-    """
-      def releases do
-        [
-          {:#{config.name},
-            [
-              overwrite: true,
-              cookie: "#{config.cookie || "grisp"}",
-              include_erts: &MixGrisp.Release.erts/0,
-              steps: [&MixGrisp.Release.init/1, :assemble],
-              include_executables_for: [],
-              strip_beams: Mix.env() == :prod
-            ]}
-        ]
-      end
-    """
-  end
+  defp releases_snippet(config), do: Snippets.releases_function(config)
 
   defp manual_steps(config) do
     steps = [
@@ -183,22 +156,9 @@ defmodule MixGrisp.Configure.MixExsPatcher do
       releases_snippet(config)
     ]
 
-    if config.epmd do
-      steps ++
-        [
-          """
-          Add to deps/0:
-            {:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false}
-          """,
-          """
-          Add epmd to your application config so its modules are available at runtime:
-            extra_applications: [:logger]
-            included_applications: [:epmd]
-          """
-        ]
-    else
-      steps
-    end
+    steps
+    |> maybe_add_epmd_manual_steps(config)
+    |> maybe_add_grisp_io_manual_steps(config)
   end
 
   defp remaining_manual_steps(%{epmd: true}) do
@@ -212,4 +172,26 @@ defmodule MixGrisp.Configure.MixExsPatcher do
   end
 
   defp remaining_manual_steps(_config), do: []
+
+  defp maybe_add_epmd_manual_steps(steps, %{epmd: true}) do
+    steps ++
+      [
+        """
+        Add to deps/0:
+          #{Snippets.epmd_dependency()}
+        """,
+        Snippets.epmd_application_manual_step()
+      ]
+  end
+
+  defp maybe_add_epmd_manual_steps(steps, _config), do: steps
+
+  defp maybe_add_grisp_io_manual_steps(steps, %{grisp_io: true}) do
+    steps ++
+      [
+        Snippets.grisp_io_dependencies_manual_step()
+      ]
+  end
+
+  defp maybe_add_grisp_io_manual_steps(steps, _config), do: steps
 end

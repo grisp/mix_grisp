@@ -1,6 +1,7 @@
 defmodule MixGrisp.Configure do
   @moduledoc false
 
+  alias MixGrisp.Configure.ConfigPatcher
   alias MixGrisp.Configure.MixExsPatcher
   alias MixGrisp.Configure.Prompter
   alias MixGrisp.Configure.Renderer
@@ -56,8 +57,15 @@ defmodule MixGrisp.Configure do
     plan = TemplatePlan.build(config)
     result = Renderer.apply(plan, config, run_opts)
     patch_result = MixExsPatcher.apply(config, run_opts)
+    config_patch_result = ConfigPatcher.apply(config, run_opts)
 
-    %{config: config, plan: plan, result: result, patch_result: patch_result}
+    %{
+      config: config,
+      plan: plan,
+      result: result,
+      patch_result: patch_result,
+      config_patch_result: config_patch_result
+    }
   end
 
   defp normalize_booleans(config) do

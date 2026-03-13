@@ -263,4 +263,57 @@ defmodule Mix.Tasks.Grisp.ConfigureTest do
     assert grisp_ini =~ "-sname mynode"
     assert grisp_ini =~ "-setcookie mycookie"
   end
+
+  test "fixture-like non-interactive grisp_io setup patches config/config.exs", %{root: root} do
+    File.write!(Path.join(root, "mix.exs"), """
+    defmodule Demo.MixProject do
+      use Mix.Project
+
+      def project do
+        [
+          app: :demo,
+          version: "0.1.0",
+          deps: deps()
+        ]
+      end
+
+      def application do
+        [
+          extra_applications: [:logger]
+        ]
+      end
+
+      defp deps do
+        []
+      end
+    end
+    """)
+
+    File.cd!(root, fn ->
+      Mix.Tasks.Grisp.Configure.run([
+        "--interactive",
+        "false",
+        "--name",
+        "demo",
+        "--network",
+        "true",
+        "--network-type",
+        "wifi",
+        "--grisp-io",
+        "true",
+        "--grisp-io-linking",
+        "true",
+        "--token",
+        "link-token"
+      ])
+    end)
+
+    config_exs = File.read!(Path.join(root, "config/config.exs"))
+
+    assert_received {:mix_shell, :info, ["Updated config/config.exs"]}
+    assert config_exs =~ "config :grisp_keychain"
+    assert config_exs =~ "config :grisp_connect"
+    assert config_exs =~ ~s(device_linking_token: "link-token")
+    assert config_exs =~ "config :grisp_updater"
+  end
 end
