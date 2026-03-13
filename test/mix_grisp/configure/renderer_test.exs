@@ -21,7 +21,7 @@ defmodule MixGrisp.Configure.RendererTest do
       |> Map.merge(%{
         name: "demo",
         network: true,
-        wifi: true
+        network_type: "wifi"
       })
 
     plan = TemplatePlan.build(config)
@@ -86,5 +86,26 @@ defmodule MixGrisp.Configure.RendererTest do
 
     assert grisp_ini =~ "-extra --no-halt"
     refute File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/erl_inetrc"))
+  end
+
+  test "renderer leaves grisp.ini without wpa line for ethernet", %{root: root} do
+    config =
+      Configure.defaults()
+      |> Map.merge(%{
+        name: "demo",
+        network: true,
+        network_type: "ethernet"
+      })
+
+    plan = TemplatePlan.build(config)
+    Renderer.apply(plan, config, root: root)
+
+    grisp_ini =
+      root
+      |> Path.join("grisp/grisp2/common/deploy/files/grisp.ini.mustache")
+      |> File.read!()
+
+    refute grisp_ini =~ "wpa=wpa_supplicant.conf"
+    refute File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/wpa_supplicant.conf"))
   end
 end

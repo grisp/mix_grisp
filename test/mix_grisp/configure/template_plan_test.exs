@@ -25,7 +25,7 @@ defmodule MixGrisp.Configure.TemplatePlanTest do
   end
 
   test "wifi plan adds wpa_supplicant.conf" do
-    assert targets_for(%{network: true, wifi: true}) == [
+    assert targets_for(%{network: true, network_type: "wifi"}) == [
              "config/config.exs",
              "grisp/grisp2/common/deploy/files/grisp.ini.mustache",
              "grisp/grisp2/common/deploy/files/wpa_supplicant.conf",

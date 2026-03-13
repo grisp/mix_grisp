@@ -9,7 +9,7 @@ defmodule MixGrisp.Configure.Renderer do
     end)
   end
 
-  defp render_entry(%{template: template, target: target}, _config, root, acc) do
+  defp render_entry(%{template: template, target: target}, config, root, acc) do
     target_path = Path.join(root, target)
 
     if File.exists?(target_path) do
@@ -18,12 +18,26 @@ defmodule MixGrisp.Configure.Renderer do
       # For now these setup assets are copied as canonical placeholders.
       # Personalizing them from configure state can be added later if needed.
       template
-      |> template_path()
-      |> File.read!()
+      |> template_contents(config)
       |> then(&write_rendered(target_path, &1))
 
       %{acc | created: [target | acc.created]}
     end
+  end
+
+  defp template_contents("grisp/grisp2/common/deploy/files/grisp.ini.mustache" = template, config) do
+    # Keep the base GRiSP.ini canonical and add the Wi-Fi-specific `wpa=` line only
+    # when the user selected Wi-Fi networking.
+    template
+    |> template_path()
+    |> File.read!()
+    |> maybe_add_wpa_line(config)
+  end
+
+  defp template_contents(template, _config) do
+    template
+    |> template_path()
+    |> File.read!()
   end
 
   defp template_path(template) do
@@ -41,4 +55,10 @@ defmodule MixGrisp.Configure.Renderer do
 
     File.write!(path, contents)
   end
+
+  defp maybe_add_wpa_line(contents, %{network_type: "wifi"}) do
+    String.replace(contents, "wlan=enable\n", "wlan=enable\nwpa=wpa_supplicant.conf\n")
+  end
+
+  defp maybe_add_wpa_line(contents, _config), do: contents
 end

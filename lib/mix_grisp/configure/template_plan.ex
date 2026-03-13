@@ -25,7 +25,7 @@ defmodule MixGrisp.Configure.TemplatePlan do
 
   defp maybe_add_network(plan, _config), do: plan
 
-  defp maybe_add_wifi(plan, %{wifi: true}) do
+  defp maybe_add_wifi(plan, %{network_type: "wifi"}) do
     plan ++
       [
         %{

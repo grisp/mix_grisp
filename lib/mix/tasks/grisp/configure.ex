@@ -15,7 +15,7 @@ defmodule Mix.Tasks.Grisp.Configure do
     otp_version: :string,
     destination: :string,
     network: :string,
-    wifi: :string,
+    network_type: :string,
     ssid: :string,
     psk: :string,
     grisp_io: :string,

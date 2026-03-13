@@ -1,7 +1,7 @@
 defmodule MixGrisp.Configure.Validator do
   @moduledoc false
 
-  @optional_string_keys [:destination, :ssid, :psk, :token, :cookie]
+  @optional_string_keys [:destination, :network_type, :ssid, :psk, :token, :cookie]
 
   def normalize(config) when is_map(config) do
     Enum.reduce(@optional_string_keys, config, fn key, acc ->
@@ -17,14 +17,17 @@ defmodule MixGrisp.Configure.Validator do
       blank_name?(config.name) ->
         Mix.raise("--name cannot be blank")
 
-      config.wifi && !config.network ->
-        Mix.raise("--wifi requires --network")
+      invalid_network_type?(config.network_type) ->
+        Mix.raise("--network-type must be either ethernet or wifi")
 
-      present?(config.ssid) && !config.wifi ->
-        Mix.raise("--ssid requires --wifi")
+      present?(config.network_type) && !config.network ->
+        Mix.raise("--network-type requires --network")
 
-      present?(config.psk) && !config.wifi ->
-        Mix.raise("--psk requires --wifi")
+      present?(config.ssid) && config.network_type != "wifi" ->
+        Mix.raise("--ssid requires --network-type wifi")
+
+      present?(config.psk) && config.network_type != "wifi" ->
+        Mix.raise("--psk requires --network-type wifi")
 
       config.grisp_io && !config.network ->
         Mix.raise("--grisp-io requires --network")
@@ -53,6 +56,7 @@ defmodule MixGrisp.Configure.Validator do
   end
 
   defp blank_name?(value), do: value in ["", nil]
+  defp invalid_network_type?(value), do: present?(value) and value not in ["ethernet", "wifi"]
   defp present?(value), do: not is_nil(value)
 
   defp normalize_name(value), do: normalize_string(value)

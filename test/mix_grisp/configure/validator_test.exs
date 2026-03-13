@@ -15,7 +15,7 @@ defmodule MixGrisp.Configure.ValidatorTest do
              otp_version: "27",
              destination: nil,
              network: false,
-             wifi: false,
+             network_type: nil,
              ssid: nil,
              psk: nil,
              grisp_io: false,
@@ -37,6 +37,7 @@ defmodule MixGrisp.Configure.ValidatorTest do
 
     assert config.name == "demo"
     assert config.network
+    assert config.network_type == nil
     assert config.ssid == nil
     assert config.destination == nil
     assert config.otp_version == "27"
@@ -46,12 +47,14 @@ defmodule MixGrisp.Configure.ValidatorTest do
     config =
       Configure.merge_cli(
         name: "  demo  ",
+        network_type: "  wifi  ",
         ssid: "   ",
         token: "  ",
         destination: "  /tmp/grisp  "
       )
 
     assert config.name == "demo"
+    assert config.network_type == "wifi"
     assert config.ssid == nil
     assert config.token == nil
     assert config.destination == "/tmp/grisp"
@@ -71,22 +74,29 @@ defmodule MixGrisp.Configure.ValidatorTest do
     end
   end
 
-  test "validator rejects wifi without network" do
-    assert_raise Mix.Error, "--wifi requires --network", fn ->
-      %{base_config() | wifi: true}
+  test "validator rejects invalid network type" do
+    assert_raise Mix.Error, "--network-type must be either ethernet or wifi", fn ->
+      %{base_config() | network: true, network_type: "bluetooth"}
+      |> Validator.validate!()
+    end
+  end
+
+  test "validator rejects network type without network" do
+    assert_raise Mix.Error, "--network-type requires --network", fn ->
+      %{base_config() | network_type: "wifi"}
       |> Validator.validate!()
     end
   end
 
   test "validator rejects ssid without wifi" do
-    assert_raise Mix.Error, "--ssid requires --wifi", fn ->
+    assert_raise Mix.Error, "--ssid requires --network-type wifi", fn ->
       %{base_config() | ssid: "mywifi"}
       |> Validator.validate!()
     end
   end
 
   test "validator rejects psk without wifi" do
-    assert_raise Mix.Error, "--psk requires --wifi", fn ->
+    assert_raise Mix.Error, "--psk requires --network-type wifi", fn ->
       %{base_config() | psk: "secret"}
       |> Validator.validate!()
     end
@@ -126,7 +136,7 @@ defmodule MixGrisp.Configure.ValidatorTest do
       |> Map.merge(%{
         name: "demo",
         network: true,
-        wifi: true,
+        network_type: "wifi",
         ssid: "mywifi",
         psk: "secret",
         grisp_io: true,
@@ -146,6 +156,8 @@ defmodule MixGrisp.Configure.ValidatorTest do
     config =
       base_config()
       |> Map.merge(%{
+        network: true,
+        network_type: "ethernet",
         token: "   ",
         cookie: "  ",
         destination: "  "

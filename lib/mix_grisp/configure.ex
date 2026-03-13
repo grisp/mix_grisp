@@ -1,11 +1,12 @@
 defmodule MixGrisp.Configure do
   @moduledoc false
 
+  alias MixGrisp.Configure.Prompter
   alias MixGrisp.Configure.Renderer
   alias MixGrisp.Configure.TemplatePlan
   alias MixGrisp.Configure.Validator
 
-  @boolean_keys [:interactive, :network, :wifi, :grisp_io, :grisp_io_linking, :epmd]
+  @boolean_keys [:interactive, :network, :grisp_io, :grisp_io_linking, :epmd]
 
   @defaults %{
     interactive: true,
@@ -13,7 +14,7 @@ defmodule MixGrisp.Configure do
     otp_version: "27",
     destination: nil,
     network: false,
-    wifi: false,
+    network_type: nil,
     ssid: nil,
     psk: nil,
     grisp_io: false,
@@ -39,22 +40,21 @@ defmodule MixGrisp.Configure do
   end
 
   def run(opts, run_opts \\ []) when is_list(opts) and is_list(run_opts) do
+    config = merge_cli(opts)
+
     config =
-      opts
-      |> merge_cli()
-      |> ensure_non_interactive!()
-      |> Validator.validate!()
+      if config.interactive do
+        Prompter.maybe_prompt(config, run_opts)
+      else
+        default_network_type(config)
+      end
+
+    config = Validator.validate!(config)
 
     plan = TemplatePlan.build(config)
     result = Renderer.apply(plan, config, run_opts)
 
     %{config: config, plan: plan, result: result}
-  end
-
-  defp ensure_non_interactive!(%{interactive: false} = config), do: config
-
-  defp ensure_non_interactive!(_config) do
-    Mix.raise("Interactive mode is not implemented yet. Use --interactive false.")
   end
 
   defp normalize_booleans(config) do
@@ -70,4 +70,10 @@ defmodule MixGrisp.Configure do
   defp normalize_boolean(value) do
     Mix.raise("Invalid boolean value: #{inspect(value)}")
   end
+
+  defp default_network_type(%{network: true, network_type: nil} = config) do
+    %{config | network_type: "ethernet"}
+  end
+
+  defp default_network_type(config), do: config
 end

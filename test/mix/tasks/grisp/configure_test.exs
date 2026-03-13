@@ -28,8 +28,8 @@ defmodule Mix.Tasks.Grisp.ConfigureTest do
         "demo",
         "--network",
         "true",
-        "--wifi",
-        "true"
+        "--network-type",
+        "wifi"
       ])
     end)
 
@@ -65,12 +65,67 @@ defmodule Mix.Tasks.Grisp.ConfigureTest do
     assert_received {:mix_shell, :info, ["Skipped grisp/grisp2/common/deploy/files/erl_inetrc"]}
   end
 
-  test "interactive mode is explicitly rejected for now", %{root: root} do
-    assert_raise Mix.Error, "Interactive mode is not implemented yet. Use --interactive false.", fn ->
-      File.cd!(root, fn ->
-        Mix.Tasks.Grisp.Configure.run(["--name", "demo"])
-      end)
-    end
+  test "interactive mode prompts for missing values and creates files", %{root: root} do
+    send(self(), {:mix_shell_input, :prompt, "demo"})
+    send(self(), {:mix_shell_input, :prompt, "y"})
+    send(self(), {:mix_shell_input, :prompt, "wifi"})
+    send(self(), {:mix_shell_input, :prompt, "mywifi"})
+    send(self(), {:mix_shell_input, :prompt, "secret"})
+    send(self(), {:mix_shell_input, :prompt, "n"})
+    send(self(), {:mix_shell_input, :prompt, "n"})
+
+    File.cd!(root, fn ->
+      Mix.Tasks.Grisp.Configure.run([])
+    end)
+
+    assert_received {:mix_shell, :prompt, ["OTP application name: "]}
+    assert_received {:mix_shell, :prompt, ["Enable network configuration? [y/N]: "]}
+    assert_received {:mix_shell, :prompt, ["Network type? [ethernet/wifi]: "]}
+    assert_received {:mix_shell, :prompt, ["Wi-Fi SSID (leave blank to skip): "]}
+    assert_received {:mix_shell, :prompt, ["Wi-Fi PSK (leave blank to skip): "]}
+    assert_received {:mix_shell, :prompt, ["Enable GRiSP.io integration? [y/N]: "]}
+    assert_received {:mix_shell, :prompt, ["Enable epmd configuration? [y/N]: "]}
+
+    assert File.exists?(Path.join(root, "config/config.exs"))
+    assert File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/grisp.ini.mustache"))
+    assert File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/wpa_supplicant.conf"))
+    assert File.exists?(Path.join(root, "grisp/grisp2/common/deploy/files/erl_inetrc"))
+  end
+
+  test "interactive mode skips prompts for values already provided", %{root: root} do
+    send(self(), {:mix_shell_input, :prompt, "ethernet"})
+    send(self(), {:mix_shell_input, :prompt, "n"})
+    send(self(), {:mix_shell_input, :prompt, "n"})
+
+    File.cd!(root, fn ->
+      Mix.Tasks.Grisp.Configure.run([
+        "--name",
+        "demo",
+        "--network",
+        "true"
+      ])
+    end)
+
+    refute_received {:mix_shell, :prompt, ["OTP application name: "]}
+    refute_received {:mix_shell, :prompt, ["Enable network configuration? [y/N]: "]}
+    assert_received {:mix_shell, :prompt, ["Network type? [ethernet/wifi]: "]}
+    assert_received {:mix_shell, :prompt, ["Enable GRiSP.io integration? [y/N]: "]}
+    assert_received {:mix_shell, :prompt, ["Enable epmd configuration? [y/N]: "]}
+  end
+
+  test "interactive mode skips wifi detail prompts when wifi is disabled", %{root: root} do
+    send(self(), {:mix_shell_input, :prompt, "demo"})
+    send(self(), {:mix_shell_input, :prompt, "y"})
+    send(self(), {:mix_shell_input, :prompt, "ethernet"})
+    send(self(), {:mix_shell_input, :prompt, "n"})
+    send(self(), {:mix_shell_input, :prompt, "n"})
+
+    File.cd!(root, fn ->
+      Mix.Tasks.Grisp.Configure.run([])
+    end)
+
+    refute_received {:mix_shell, :prompt, ["Wi-Fi SSID (leave blank to skip): "]}
+    refute_received {:mix_shell, :prompt, ["Wi-Fi PSK (leave blank to skip): "]}
   end
 
   test "invalid boolean values are rejected", %{root: root} do
