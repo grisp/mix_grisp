@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Elixir 1.20 / OTP ${{ matrix.otp }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ["27", "28", "29"]
+
+    env:
+      MIX_ENV: test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install Erlang and Elixir
+        uses: erlef/setup-beam@0f75c29430f34bb5af4cce5e3b7f6a8860fca236 # v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          elixir-version: "1.20"
+
+      - name: Restore dependency and build caches
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-otp-${{ matrix.otp }}-elixir-1.20-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-otp-${{ matrix.otp }}-elixir-1.20-
+
+      - name: Install Hex and Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Fetch dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile plugin
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        run: mix test --warnings-as-errors
