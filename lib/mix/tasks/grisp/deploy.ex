@@ -27,53 +27,40 @@ defmodule Mix.Tasks.Grisp.Deploy do
     release_name = Project.config()[:app]
     release_version = to_charlist(Project.config()[:version])
 
-    try do
-      %{
-        project_root: to_charlist(File.cwd!()),
-        otp_version_requirement: to_charlist(config[:otp][:version] || "29"),
-        jit: Keyword.get(config[:otp] || [], :jit, false),
-        platform: Keyword.get(config, :platform, :grisp2),
-        apps: apps(),
-        custom_build: false,
-        distribute: [
-          {:copy,
-           %{
-             type: :copy,
-             force: force,
-             destination: to_charlist(destination),
-             scripts: %{
-               pre_script: deploy_config[:pre_script] || :undefined,
-               post_script: deploy_config[:post_script] || :undefined
-             }
-           }}
-        ],
-        release: %{
-          name: release_name,
-          version: release_version
-        },
-        handlers:
-          :grisp_tools.handlers_init(%{
-            event:
-              {&event_handler/2,
-               %{
-                 name: release_name,
-                 version: release_version
-               }},
-            shell: {&shell_handler/3, %{}},
-            release: {&release_handler/2, nil}
-          })
-      }
-      |> :grisp_tools.deploy()
-      |> :grisp_tools.handlers_finalize()
+    %{
+      project_root: to_charlist(File.cwd!()),
+      otp_version_requirement: to_charlist(config[:otp][:version] || "29"),
+      jit: Keyword.get(config[:otp] || [], :jit, false),
+      platform: Keyword.get(config, :platform, :grisp2),
+      apps: apps(),
+      custom_build: false,
+      distribute: [
+        {:copy,
+         %{
+           type: :copy,
+           force: force,
+           destination: to_charlist(destination),
+           scripts: %{
+             pre_script: deploy_config[:pre_script] || :undefined,
+             post_script: deploy_config[:post_script] || :undefined
+           }
+         }}
+      ],
+      release: %{
+        name: release_name,
+        version: release_version
+      },
+      handlers:
+        :grisp_tools.handlers_init(%{
+          event: {&event_handler/2, %{}},
+          shell: {&shell_handler/3, %{}},
+          release: {&release_handler/2, nil}
+        })
+    }
+    |> :grisp_tools.deploy()
+    |> :grisp_tools.handlers_finalize()
 
-      info("Deployment done")
-    catch
-      :error, {:otp_version_mismatch, target, current} ->
-        Mix.raise(
-          "Current Erlang version (#{current}) does not match target" <>
-            " Erlang version (#{target})"
-        )
-    end
+    info("Deployment done")
   end
 
   defp event_handler(event, state) do
@@ -169,108 +156,6 @@ defmodule Mix.Tasks.Grisp.Deploy do
 
   defp handle_event([:deploy, :distribute, _name, {:error, reason, path}], _state) do
     fail!("Deployment destination error for #{path}: #{reason}")
-  end
-
-  defp handle_event({:otp_type, hash, :custom_build}, state) do
-    header("Using custom OTP (#{short(hash)})")
-    state
-  end
-
-  defp handle_event({:otp_type, hash, :package}, state) do
-    header("Downloading OTP (#{short(hash)})")
-    info("Version: #{short(hash)}")
-    state
-  end
-
-  defp handle_event({:package, {:download_start, size}}, state) do
-    IO.write("    0%")
-    Map.put(state, :progress, {0, size})
-  end
-
-  defp handle_event(
-         {:package, {:download_progress, current}},
-         %{:progress => {tens, total}} = state
-       ) do
-    new_tens = round(current / total * 10)
-
-    if new_tens > tens do
-      IO.write(" #{new_tens * 10}%")
-    end
-
-    %{state | :progress => {new_tens, total}}
-  end
-
-  defp handle_event({:package, {:download_complete, _etag}}, state) do
-    IO.write(" OK\n")
-    state
-  end
-
-  defp handle_event({:package, :download_cached}, state) do
-    info("Download already cached")
-    state
-  end
-
-  defp handle_event({:package, {:http_error, other}}, state) do
-    warn("Download error: #{inspect(other)}")
-    info("Using cached file")
-    state
-  end
-
-  defp handle_event({:package, {:extract, :up_to_date}}, state) do
-    info("Current package up to date")
-    state
-  end
-
-  defp handle_event({:package, {:extract, {:start, _package}}}, state) do
-    info("Extracting package")
-    state
-  end
-
-  defp handle_event({:package, {:extract_failed, reason}}, _State) do
-    fail!("Tar extraction failed: #{inspect(reason)}")
-  end
-
-  defp handle_event({:release, {:start, _release}}, state) do
-    header("Creating release")
-    state
-  end
-
-  defp handle_event({:release, {:done, release}}, state) do
-    info("Release complete: #{release.name}-#{release.version}")
-    state
-  end
-
-  defp handle_event({:deployment, :init}, state) do
-    header("Deploying")
-    state
-  end
-
-  defp handle_event({:deployment, :script, name, {:run, _script}}, state) do
-    info("Running #{name}")
-    state
-  end
-
-  defp handle_event({:deployment, :script, _name, {:result, _output}}, state) do
-    state
-  end
-
-  defp handle_event({:deployment, :release, {:copy, _source, _target}}, state) do
-    info("Copying release...")
-    state
-  end
-
-  defp handle_event({:deployment, {:files, {:init, _dest}}}, state) do
-    info("Copying files...")
-    state
-  end
-
-  defp handle_event({:deployment, :files, {:copy_error, {:exists, file}}}, _State) do
-    fail!("Destination #{file} already exists (use --force to overwrite)")
-  end
-
-  defp handle_event({:deployment, :done}, state) do
-    header(IO.ANSI.format(["Deployment ", :green, "succesful", :blue, "!"]))
-    state
   end
 
   defp handle_event(_event, state) do
