@@ -1,249 +1,41 @@
 defmodule Mix.Tasks.Grisp.Deploy do
-  @moduledoc """
-  Deploys a GRiSP application.
-  """
-  alias Mix.Project
-
   use Mix.Task
+
   @recursive true
+  @shortdoc "Deploys a GRiSP release to a destination"
 
-  @shortdoc "Deploys a GRiSP application"
+  @moduledoc """
+  Deploys a GRiSP release to a directory or creates a release bundle.
 
+      mix grisp.deploy [options] [-- MIX_RELEASE_OPTIONS]
+
+  Options:
+
+    * `--relname`, `-n` - release name
+    * `--relvsn`, `-v` - release version
+    * `--tar`, `-t` - create a bundle in `_grisp/deploy`
+    * `--destination`, `-d` - copy destination
+    * `--force`, `-f` - replace existing files
+    * `--pre-script` - command to run before copying
+    * `--post-script` - command to run after copying
+
+  Arguments after `--` are passed to `mix release`.
+  """
+
+  @switches [
+    relname: :string,
+    relvsn: :string,
+    tar: :boolean,
+    destination: :string,
+    force: :boolean,
+    pre_script: :string,
+    post_script: :string
+  ]
+  @aliases [n: :relname, v: :relvsn, t: :tar, d: :destination, f: :force]
+
+  @impl Mix.Task
   def run(args) do
-    Mix.Task.run("compile", [])
-
-    header("🐟 Deploying GRiSP application")
-
-    {:ok, _} = Application.ensure_all_started(:grisp_tools)
-    config = Mix.Project.config()[:grisp]
-    deploy_config = config[:deploy] || []
-    destination = deploy_config[:destination] || "tmp/grisp_sd"
-    force = "--force" in args
-
-    if is_nil(deploy_config[:destination]) do
-      File.mkdir_p!(destination)
-    end
-
-    release_name = Project.config()[:app]
-    release_version = to_charlist(Project.config()[:version])
-
-    %{
-      project_root: to_charlist(File.cwd!()),
-      otp_version_requirement: to_charlist(config[:otp][:version] || "29"),
-      jit: Keyword.get(config[:otp] || [], :jit, false),
-      platform: Keyword.get(config, :platform, :grisp2),
-      apps: apps(),
-      custom_build: false,
-      distribute: [
-        {:copy,
-         %{
-           type: :copy,
-           force: force,
-           destination: to_charlist(destination),
-           scripts: %{
-             pre_script: deploy_config[:pre_script] || :undefined,
-             post_script: deploy_config[:post_script] || :undefined
-           }
-         }}
-      ],
-      release: %{
-        name: release_name,
-        version: release_version
-      },
-      handlers:
-        :grisp_tools.handlers_init(%{
-          event: {&event_handler/2, %{}},
-          shell: {&shell_handler/3, %{}},
-          release: {&release_handler/2, nil}
-        })
-    }
-    |> :grisp_tools.deploy()
-    |> :grisp_tools.handlers_finalize()
-
-    info("Deployment done")
-  end
-
-  defp event_handler(event, state) do
-    debug(event, label: "event")
-    {:ok, handle_event(event, state)}
-  end
-
-  defp handle_event([:deploy, :package, {:type, {:custom_build, hash}}], state) do
-    header("Using custom OTP (#{short(hash)})")
-    state
-  end
-
-  defp handle_event([:deploy, :package, {:type, {:package, hash}}], state) do
-    header("Using pre-built OTP package (#{short(hash)})")
-    state
-  end
-
-  defp handle_event([:deploy, :package, :download, {:start, size}], state) do
-    IO.write("    0%")
-    Map.put(state, :progress, {0, size})
-  end
-
-  defp handle_event(
-         [:deploy, :package, :download, {:progress, current}],
-         %{progress: {tens, total}} = state
-       )
-       when is_integer(total) and total > 0 do
-    new_tens = round(current / total * 10)
-
-    if new_tens > tens do
-      IO.write(" #{new_tens * 10}%")
-    end
-
-    %{state | progress: {new_tens, total}}
-  end
-
-  defp handle_event([:deploy, :package, :download, {:complete, _etag}], state) do
-    IO.write(" OK\n")
-    state
-  end
-
-  defp handle_event([:deploy, :package, :download, :_skip], state) do
-    info("Package already cached")
-    state
-  end
-
-  defp handle_event([:deploy, :package, :download, {:error, reason}], state) do
-    warn("Download error: #{inspect(reason)}")
-    info("Using cached file")
-    state
-  end
-
-  defp handle_event([:deploy, :package, :extract, :_skip], state) do
-    info("Package already extracted")
-    state
-  end
-
-  defp handle_event([:deploy, :package, :extract, {:error, reason}], _state) do
-    fail!("Tar extraction failed: #{inspect(reason)}")
-  end
-
-  defp handle_event([:deploy, :release, {:start, _release}], state) do
-    header("Creating release")
-    state
-  end
-
-  defp handle_event([:deploy, :release, {:done, release}], state) do
-    info("Release complete: #{release.name}-#{release.version}")
-    state
-  end
-
-  defp handle_event([:deploy, :distribute, _name, _script, {:run, _command}], state) do
-    state
-  end
-
-  defp handle_event([:deploy, :distribute, _name, _script, {:result, _output}], state) do
-    state
-  end
-
-  defp handle_event([:deploy, :distribute, :copy, :release, {:copy, _source, _target}], state) do
-    info("Copying release...")
-    state
-  end
-
-  defp handle_event([:deploy, :distribute, :copy, :files, {:init, _destination}], state) do
-    info("Copying files...")
-    state
-  end
-
-  defp handle_event([:deploy, :distribute, _name, :files, {:error, :file_exists, path}], _state) do
-    fail!("Destination #{path} already exists (use --force to overwrite)")
-  end
-
-  defp handle_event([:deploy, :distribute, _name, {:error, reason, path}], _state) do
-    fail!("Deployment destination error for #{path}: #{reason}")
-  end
-
-  defp handle_event(_event, state) do
-    state
-  end
-
-  defp shell_handler(raw_cmd, opts, state) do
-    cmd = raw_cmd |> IO.iodata_to_binary()
-    debug(cmd, label: "cmd")
-
-    [cmd | args] = String.split(cmd)
-    args = for arg <- args, do: String.trim(arg, "\"")
-
-    opts =
-      Keyword.update!(opts, :env, fn env ->
-        for {k, v} <- env, do: {List.to_string(k), List.to_string(v)}
-      end)
-
-    {result, ret} = System.cmd(cmd, args, opts)
-
-    case ret do
-      0 -> {{:ok, result}, state}
-      _ -> Mix.raise("Error executing #{cmd} #{args}")
-    end
-  end
-
-  defp release_handler(relspec, state) do
-    debug(relspec, label: "relspec")
-    Process.put(:relspec, relspec)
-
-    Mix.Task.run("release", [])
-
-    spec = Process.get(:spec)
-
-    Process.delete(:relspec)
-    Process.delete(:spec)
-
-    {%{
-       dir: spec.path |> String.to_charlist(),
-       name: spec.name,
-       version: spec.version |> String.to_charlist()
-     }, state}
-  end
-
-  # gathering the apps and their deps to build the grisp overlay later
-  # since mix keeps dependency sources and their build output separate it is
-  # important to use the source paths here. These paths will be used by :grisp_tools
-  # to assemble the overlays
-  @spec apps() :: [{Application.app(), %{dir: charlist(), deps: []}}]
-  defp apps do
-    old = Mix.env()
-    Mix.env(:grisp)
-    config = Project.config()
-    app = {config[:app], %{dir: File.cwd!(), deps: Project.deps_apps()}}
-    {_, %{name: bottom}} = Mix.ProjectStack.top_and_bottom()
-    {_, all_deps} = Mix.State.read_cache({:cached_deps, bottom})
-
-    all_apps =
-      all_deps
-      |> Enum.map(fn dep ->
-        sub_deps =
-          for d <- dep.deps do
-            d.app
-          end
-
-        {dep.app, %{dir: dep.opts[:dest], deps: sub_deps}}
-      end)
-
-    Mix.env(old)
-    all_apps ++ [app]
-  end
-
-  defp short(string), do: String.slice(to_string(string), 0..8)
-
-  defp header(message), do: Mix.shell().info(IO.ANSI.format([:blue, "===> ", message]))
-  defp info(message), do: Mix.shell().info(message)
-  defp warn(message), do: Mix.shell().info(IO.ANSI.format([:yellow, message]))
-  defp fail!(message), do: Mix.raise(message)
-
-  defp debug(message, label: label) when is_binary(message) do
-    if Mix.debug?() do
-      IO.ANSI.format([:cyan, "mix_grisp[#{label}]: ", message])
-      |> IO.puts()
-    end
-  end
-
-  defp debug(term, opts) do
-    debug(inspect(term), opts)
-    term
+    {options, release_args} = MixGrisp.CLI.parse!(args, @switches, @aliases)
+    MixGrisp.Deploy.run(options, release_args)
   end
 end
