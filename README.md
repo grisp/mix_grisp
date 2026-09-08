@@ -35,17 +35,24 @@ mix grisp.version
 
 ## Create a new application
 
-The configure task creates a supervised Mix application with release and GRiSP
-configuration, plus optional networking files:
+Install the dependency-free `grisp_new` archive to make the project generator
+available globally:
 
 ```console
-mix grisp.configure
+mix archive.install hex grisp_new
+```
+
+Its configure task creates a supervised Mix application with release and
+GRiSP configuration, plus optional networking files:
+
+```console
+mix grisp.new
 ```
 
 For non-interactive use:
 
 ```console
-mix grisp.configure --no-interactive --name my_grisp_app \
+mix grisp.new --no-interactive --name my_grisp_app \
   --ssid mywifi --psk wifipsk
 ```
 
