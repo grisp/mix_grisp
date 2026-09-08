@@ -20,83 +20,134 @@ defmodule MixGrisp.Configure do
   ]
 
   def run(options) do
+    supplied = options |> Keyword.keys() |> MapSet.new()
+
     config =
       options
       |> Keyword.merge(@defaults, fn _key, supplied, _default -> supplied end)
       |> Keyword.update!(:copyright_year, &(&1 || Integer.to_string(Date.utc_today().year)))
-      |> prompt()
+      |> prompt(supplied)
 
     validate!(config)
     root = Path.expand(config[:name])
+    project_exists? = File.exists?(root)
 
-    if File.exists?(root), do: Mix.raise("Project directory already exists: #{root}")
-
-    Mix.Task.reenable("new")
-    Mix.Tasks.New.run([root, "--app", config[:name], "--sup"])
+    if project_exists? do
+      confirm_existing!(root, config[:interactive])
+    else
+      Mix.Task.reenable("new")
+      Mix.Tasks.New.run([root, "--app", config[:name], "--sup"])
+    end
 
     created =
       [
-        write_elixir(Path.join(root, "mix.exs"), mix_exs(config)),
-        write_elixir(Path.join(root, "config/config.exs"), app_config(config)),
-        write(Path.join(root, "README.md"), project_readme(config)),
-        write(Path.join(root, "LICENSE"), license(config))
-      ] ++ network_files(root, config)
+        write_elixir(Path.join(root, "mix.exs"), mix_exs(config), project_exists?),
+        write_elixir(
+          Path.join(root, "config/config.exs"),
+          app_config(config),
+          project_exists?
+        ),
+        write(Path.join(root, "README.md"), project_readme(config), project_exists?),
+        write(Path.join(root, "LICENSE"), license(config), project_exists?)
+      ] ++ network_files(root, config, project_exists?)
+
+    created = Enum.reject(created, &is_nil/1)
+
+    if project_exists? do
+      Mix.shell().info(
+        "The project directory already existed; existing files were not overwritten. " <>
+          "Review the project configuration before continuing."
+      )
+    end
 
     %{name: config[:name], root: root, config: config, created: created}
   end
 
-  defp prompt(config) do
+  defp prompt(config, supplied) do
     if config[:interactive] do
       config
-      |> ask(:name, "App name", &identity/1)
-      |> ask(:otp_version, "Erlang/OTP version", &identity/1)
-      |> ask_bool(:jit, "Enable the Arm32 JIT?")
-      |> ask(:dest, "SD card path", &identity/1)
-      |> ask_bool(:network, "Generate network configuration?")
-      |> prompt_network()
+      |> ask_valid_name_unless_supplied(supplied)
+      |> ask_unless_supplied(supplied, :otp_version, "Erlang/OTP version", &identity/1)
+      |> ask_bool_unless_supplied(supplied, :jit, "Enable the Arm32 JIT patches?")
+      |> ask_unless_supplied(supplied, :dest, "SD card path", &identity/1)
+      |> ask_bool_unless_supplied(supplied, :network, "Generate network configuration?")
+      |> prompt_network(supplied)
     else
       config
     end
   end
 
-  defp prompt_network(config) do
+  defp prompt_network(config, supplied) do
     if config[:network] do
       config
-      |> ask_bool(:wifi, "Use Wi-Fi?")
-      |> prompt_wifi()
-      |> ask_bool(:grisp_io, "Enable GRiSP.io integration?")
-      |> prompt_grisp_io()
-      |> ask_bool(:epmd, "Enable distributed Erlang?")
-      |> prompt_epmd()
+      |> ask_bool_unless_supplied(supplied, :wifi, "Use Wi-Fi?")
+      |> prompt_wifi(supplied)
+      |> ask_bool_unless_supplied(supplied, :grisp_io, "Enable GRiSP.io integration?")
+      |> prompt_grisp_io(supplied)
+      |> ask_bool_unless_supplied(supplied, :epmd, "Enable distributed Erlang?")
+      |> prompt_epmd(supplied)
     else
       config
     end
   end
 
-  defp prompt_wifi(config) do
+  defp prompt_wifi(config, supplied) do
     if config[:wifi] do
-      config |> ask(:ssid, "Wi-Fi SSID", &identity/1) |> ask(:psk, "Wi-Fi password", &identity/1)
+      config
+      |> ask_unless_supplied(supplied, :ssid, "Wi-Fi SSID", &identity/1)
+      |> ask_unless_supplied(supplied, :psk, "Wi-Fi password", &identity/1)
     else
       config
     end
   end
 
-  defp prompt_grisp_io(config) do
+  defp prompt_grisp_io(config, supplied) do
     if config[:grisp_io] do
-      config |> ask_bool(:grisp_io_linking, "Link a GRiSP2 board?") |> maybe_ask_token()
+      config
+      |> ask_bool_unless_supplied(supplied, :grisp_io_linking, "Link a GRiSP2 board?")
+      |> maybe_ask_token(supplied)
     else
       config
     end
   end
 
-  defp maybe_ask_token(config) do
+  defp maybe_ask_token(config, supplied) do
     if config[:grisp_io_linking],
-      do: ask(config, :token, "Device linking token", &String.trim/1),
+      do: ask_unless_supplied(config, supplied, :token, "Device linking token", &String.trim/1),
       else: config
   end
 
-  defp prompt_epmd(config) do
-    if config[:epmd], do: ask(config, :cookie, "Erlang cookie", &identity/1), else: config
+  defp prompt_epmd(config, supplied) do
+    if config[:epmd],
+      do: ask_unless_supplied(config, supplied, :cookie, "Erlang cookie", &identity/1),
+      else: config
+  end
+
+  defp ask_unless_supplied(config, supplied, key, label, normalize) do
+    if MapSet.member?(supplied, key), do: config, else: ask(config, key, label, normalize)
+  end
+
+  defp ask_bool_unless_supplied(config, supplied, key, label) do
+    if MapSet.member?(supplied, key), do: config, else: ask_bool(config, key, label)
+  end
+
+  defp ask_valid_name_unless_supplied(config, supplied) do
+    if MapSet.member?(supplied, :name) and valid_name?(config[:name]) do
+      config
+    else
+      ask_valid_name(config)
+    end
+  end
+
+  defp ask_valid_name(config) do
+    config = ask(config, :name, "App name", &identity/1)
+
+    if valid_name?(config[:name]) do
+      config
+    else
+      Mix.shell().error(name_error())
+      ask_valid_name(Keyword.put(config, :name, nil))
+    end
   end
 
   defp ask(config, key, label, normalize) do
@@ -110,21 +161,24 @@ defmodule MixGrisp.Configure do
     hint = if default, do: "Y/n", else: "y/N"
     answer = Mix.shell().prompt("#{label} [#{hint}]: ") |> String.trim() |> String.downcase()
 
-    value =
-      case answer do
-        "" -> default
-        value when value in ["y", "yes", "true"] -> true
-        value when value in ["n", "no", "false"] -> false
-        _ -> Mix.raise("Expected yes or no")
-      end
+    case answer do
+      "" ->
+        Keyword.put(config, key, default)
 
-    Keyword.put(config, key, value)
+      value when value in ["y", "yes", "true"] ->
+        Keyword.put(config, key, true)
+
+      value when value in ["n", "no", "false"] ->
+        Keyword.put(config, key, false)
+
+      _ ->
+        Mix.shell().error("Expected yes or no")
+        ask_bool(config, key, label)
+    end
   end
 
   defp validate!(config) do
-    unless config[:name] =~ ~r/^[a-z][a-z0-9_]*$/ do
-      Mix.raise("Application name must contain lowercase letters, numbers, and underscores")
-    end
+    unless valid_name?(config[:name]), do: Mix.raise(name_error())
 
     if config[:wifi] and not config[:network], do: Mix.raise("--wifi requires --network")
 
@@ -142,33 +196,39 @@ defmodule MixGrisp.Configure do
     if config[:epmd] and not config[:network], do: Mix.raise("--epmd requires --network")
   end
 
-  defp network_files(root, config) do
+  defp network_files(root, config, preserve?) do
     if config[:network] do
       base = Path.join(root, "grisp/grisp2/common/deploy/files")
-      files = [write(Path.join(base, "grisp.ini.mustache"), grisp_ini(config))]
+      files = [write(Path.join(base, "grisp.ini.mustache"), grisp_ini(config), preserve?)]
 
       files =
         if config[:wifi],
-          do: files ++ [write(Path.join(base, "wpa_supplicant.conf"), wpa(config))],
+          do:
+            files ++
+              [write(Path.join(base, "wpa_supplicant.conf"), wpa(config), preserve?)],
           else: files
 
-      if config[:grisp_io],
-        do: files,
-        else: files ++ [write(Path.join(base, "erl_inetrc"), inetrc())]
+      files ++ [write(Path.join(base, "erl_inetrc"), inetrc(), preserve?)]
     else
       []
     end
   end
 
-  defp write(path, contents) do
+  defp write(path, contents, preserve?)
+
+  defp write(path, contents, true) when is_binary(path) do
+    if File.exists?(path), do: nil, else: write(path, contents, false)
+  end
+
+  defp write(path, contents, false) do
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, contents)
     path
   end
 
-  defp write_elixir(path, contents) do
+  defp write_elixir(path, contents, preserve?) do
     formatted = contents |> Code.format_string!() |> IO.iodata_to_binary()
-    write(path, formatted <> "\n")
+    write(path, formatted <> "\n", preserve?)
   end
 
   defp mix_exs(config) do
@@ -184,7 +244,17 @@ defmodule MixGrisp.Configure do
     grisp_io_deps =
       if config[:grisp_io],
         do:
-          "\n      {:certifi, \">= 0.0.0\"},\n      {:grisp_cryptoauth, \">= 0.0.0\"},\n      {:grisp_updater_grisp2, \">= 0.0.0\"},\n      {:grisp_connect, \">= 0.0.0\"},",
+          "\n      {:certifi, \">= 0.0.0\"},\n      {:grisp_cryptoauth, \"~> 2.6\"},\n      {:grisp_updater_grisp2, \"~> 1.0\", runtime: false},\n      {:grisp_connect, \"~> 3.0.0\"},",
+        else: ""
+
+    grisp_dep =
+      if config[:grisp_io],
+        do: "{:grisp, \"~> 2.12\", override: true}",
+        else: "{:grisp, \"~> 2.12\"}"
+
+    grisp_io_release_apps =
+      if config[:grisp_io],
+        do: "\n            applications: [sasl: :permanent, grisp_updater_grisp2: :load],",
         else: ""
 
     """
@@ -214,7 +284,7 @@ defmodule MixGrisp.Configure do
 
       defp deps do
         [#{epmd_dep}#{grisp_io_deps}
-          {:grisp, "~> 2.12"},
+          #{grisp_dep},
           {:mix_grisp, "~> 0.2", runtime: false}
         ]
       end
@@ -231,7 +301,7 @@ defmodule MixGrisp.Configure do
         [
           #{config[:name]}: [
             overwrite: true,
-            cookie: #{inspect(config[:cookie])},
+            cookie: #{inspect(config[:cookie])},#{grisp_io_release_apps}
             include_erts: &MixGrisp.Release.erts/0,
             steps: [&MixGrisp.Release.init/1, :assemble],
             include_executables_for: [],
@@ -244,62 +314,57 @@ defmodule MixGrisp.Configure do
   end
 
   defp app_config(config) do
-    linking =
-      if config[:token], do: "\n  device_linking_token: #{inspect(config[:token])},", else: ""
+    connect_config =
+      if config[:token] do
+        "config :grisp_connect,\n  device_linking_token: #{inspect(config[:token])}\n"
+      else
+        ""
+      end
 
     base = "import Config\n"
 
     if config[:grisp_io] do
-      base <>
-        """
+      rendered =
+        "config/grisp_io.exs"
+        |> template()
+        |> String.replace("__GRISP_CONNECT_CONFIG__", connect_config)
 
-        config :grisp_keychain, api_module: :grisp_cryptoauth
-        config :grisp_cryptoauth, tls_server_trusted_certs_cb: {:certifi, :cacerts, []}
-        config :grisp_connect,#{linking}
-          logger: []
-        config :grisp_updater,
-          system: {:grisp_updater_grisp2, %{}},
-          sources: [
-            {:grisp_updater_tarball, %{}},
-            {:grisp_updater_http, %{backend: {:grisp_updater_grisp2, %{}}}}
-          ]
-        """
+      base <> "\n" <> rendered
     else
       base
     end
   end
 
   defp grisp_ini(config) do
-    wpa = if config[:wifi], do: "wpa=wpa_supplicant.conf\n", else: ""
+    wifi = if config[:wifi], do: "wlan=enable\nwpa=wpa_supplicant.conf\n", else: ""
+    grisp_io = if config[:grisp_io], do: " -kernel logger_level notice", else: ""
 
-    dist =
+    epmd =
       if config[:epmd],
-        do:
-          " -kernel inetrc \"./erl_inetrc\" -internal_epmd epmd_sup -sname #{config[:name]} -setcookie #{config[:cookie]}",
+        do: " -internal_epmd epmd_sup -sname #{config[:name]} -setcookie #{config[:cookie]}",
         else: ""
 
-    """
-    [erlang]
-    args = erl.rtems -C multi_time_warp -fnu -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib -config {{release_name}}/releases/{{release_version}}/sys.config#{dist} -user elixir -extra +iex --no-halt
-    shell = none
-
-    [network]
-    ip_self=dhcp
-    wlan=enable
-    #{wpa}hostname=GRISP_HOSTNAME
-    """
+    "grisp/grisp2/common/deploy/files/grisp.ini.mustache"
+    |> template()
+    |> String.replace("__EPMD_ARGS__", epmd)
+    |> String.replace("__GRISP_IO_ARGS__", grisp_io)
+    |> String.replace("__WIFI_CONFIG__", wifi)
   end
 
-  defp wpa(config),
-    do:
-      "network={\n    ssid=#{inspect(config[:ssid] || "WLAN_SSID")}\n    key_mgmt=WPA-PSK\n    psk=#{inspect(config[:psk] || "WLAN_PASSWORD")}\n}\n"
+  defp wpa(config) do
+    "grisp/grisp2/common/deploy/files/wpa_supplicant.conf"
+    |> template()
+    |> String.replace("__WLAN_SSID__", inspect(config[:ssid] || "WLAN_SSID"))
+    |> String.replace("__WLAN_PASSWORD__", inspect(config[:psk] || "WLAN_PASSWORD"))
+  end
 
-  defp inetrc do
-    """
-    {hosts_file, ""}.
-    {cache_size, 0}.
-    {lookup, [file, dns]}.
-    """
+  defp inetrc, do: template("grisp/grisp2/common/deploy/files/erl_inetrc")
+
+  defp template(relative_path) do
+    :mix_grisp
+    |> Application.app_dir("priv/templates")
+    |> Path.join(relative_path)
+    |> File.read!()
   end
 
   defp project_readme(config) do
@@ -337,4 +402,33 @@ defmodule MixGrisp.Configure do
   end
 
   defp identity(value), do: value
+
+  defp valid_name?(name) when is_binary(name), do: Regex.match?(~r/^[a-z][a-z0-9_]*$/, name)
+  defp valid_name?(_name), do: false
+
+  defp name_error,
+    do: "Application name must contain lowercase letters, numbers, and underscores"
+
+  defp confirm_existing!(root, false), do: Mix.raise("Project directory already exists: #{root}")
+
+  defp confirm_existing!(root, true) do
+    answer =
+      Mix.shell().prompt(
+        "Project directory #{root} already exists. Continue without overwriting files? [y/N]: "
+      )
+      |> String.trim()
+      |> String.downcase()
+
+    case answer do
+      value when value in ["y", "yes", "true"] ->
+        :ok
+
+      value when value in ["", "n", "no", "false"] ->
+        Mix.raise("Project directory already exists: #{root}")
+
+      _ ->
+        Mix.shell().error("Expected yes or no")
+        confirm_existing!(root, true)
+    end
+  end
 end
