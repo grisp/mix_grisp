@@ -21,7 +21,7 @@ Add GRiSP and this build-time plugin to `mix.exs`:
 defp deps do
   [
     {:grisp, "~> 2.12"},
-    {:mix_grisp, "~> 0.2", runtime: false}
+    {:mix_grisp, "~> 1.0", runtime: false}
   ]
 end
 ```

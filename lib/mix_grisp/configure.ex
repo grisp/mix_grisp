@@ -262,7 +262,7 @@ defmodule MixGrisp.Configure do
       defp deps do
         [#{epmd_dep}#{grisp_io_deps}
           #{grisp_dep},
-          {:mix_grisp, "~> 0.2", runtime: false}
+          {:mix_grisp, "~> 1.0", runtime: false}
         ]
       end
 

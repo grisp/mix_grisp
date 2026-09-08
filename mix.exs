@@ -6,7 +6,7 @@ defmodule MixGrisp.MixProject do
   def project() do
     [
       app: :mix_grisp,
-      version: "0.2.0",
+      version: "1.0.0",
       description: "Mix plug-in for GRiSP.",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
@@ -31,8 +31,8 @@ defmodule MixGrisp.MixProject do
 
   defp package() do
     [
-      files: ~w(lib priv .formatter.exs mix.exs README* LICENSE*),
-      licenses: ["Apache 2.0"],
+      files: ~w(lib priv .formatter.exs mix.exs README* CHANGELOG* LICENSE*),
+      licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md"
