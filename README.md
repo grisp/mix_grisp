@@ -35,8 +35,8 @@ mix grisp.version
 
 ## Create a new application
 
-The configure task creates a supervised Mix application, release and GRiSP
-configuration, and optional networking files:
+The configure task creates a supervised Mix application with release and GRiSP
+configuration, plus optional networking files:
 
 ```console
 mix grisp.configure
@@ -46,13 +46,23 @@ For non-interactive use:
 
 ```console
 mix grisp.configure --no-interactive --name my_grisp_app \
-  --network --wifi --ssid mywifi --psk wifipsk
+  --ssid mywifi --psk wifipsk
 ```
 
-Important options are `--name`, `--otp-version`, `--[no-]jit`, `--dest`,
-`--network`, `--wifi`, `--ssid`, `--psk`, `--grisp-io`,
-`--grisp-io-linking`, `--token`, `--epmd`, and `--cookie`. Wi-Fi requires
-networking; credentials require Wi-Fi; GRiSP.io and EPMD require networking.
+Important options are `--name`, `--otp-version`, `--jit true|false`, `--dest`,
+`--wifi`, `--ssid`, `--psk`, `--grisp-io`, `--grisp-io-linking TOKEN`,
+`--epmd`, and `--cookie`.
+The JIT option uses the rebar-compatible explicit values `--jit true` and
+`--jit false`. In non-interactive mode, optional features are disabled when
+their flags are absent. Ethernet networking is always configured. Wi-Fi is
+opt-in through `--wifi` and is also enabled implicitly when either `--ssid` or
+`--psk` is supplied. Supplying `--grisp-io-linking TOKEN` also enables GRiSP.io
+integration.
+
+If the target directory already exists, interactive mode asks for confirmation,
+preserves every existing file, and creates only missing files. Non-interactive
+mode refuses to configure an existing directory so scripts cannot overwrite a
+project accidentally.
 
 ## Configure an existing application
 
@@ -96,9 +106,9 @@ defp releases do
 end
 ```
 
-`:platform` defaults to `:grisp2`. The configured OTP requirement selects a
-pre-built package unless a `:build` section enables a custom build. Compile on
-the development host with the same OTP major version as the target.
+`:platform` defaults to `:grisp2`. The configured OTP version requirement
+selects a pre-built package unless a `:build` section enables a custom build.
+Compile on the development host with the same OTP major version as the target.
 
 ## Elixir shell and networking
 
@@ -133,6 +143,13 @@ network={
 ```
 
 Do not commit real credentials. See the [GRiSP networking guide][networking].
+Ethernet is always configured. For Ethernet-only networking, omit the Wi-Fi
+options; the configure task then leaves out `wlan=enable`, the `wpa` setting,
+and `wpa_supplicant.conf`.
+
+When `--grisp-io` is enabled, the generated project also includes the required
+GRiSP.io dependencies and release applications. Its Logger level is set to
+`:notice` to avoid emitting connection-level debug messages on the board.
 
 ## Deploy a release
 
@@ -189,19 +206,20 @@ mix grisp.firmware --image --no-truncate
 mix grisp.firmware --bundle path/to/release.tar.gz
 ```
 
-Other options are `--[no-]compress`, `--quiet`, and all release selection
-options. A bundle is created through `grisp.deploy --tar` when not supplied;
-`--refresh` recreates it. Image and bootloader generation requires a toolchain.
+Other options are `--[no-]compress`, `--quiet`, and all release-selection
+options. If no bundle is supplied, the task creates one through
+`grisp.deploy --tar`; `--refresh` recreates it. Image and bootloader generation
+require a toolchain.
 
 To install firmware, copy it to the GRiSP SD card, unmount the card, open the
-serial console, insert the card, reset, and interrupt barebox. Write system
+serial console, insert the card, reset, and interrupt barebox. Write the system
 firmware to the active partition (`/dev/mmc1.0` or `/dev/mmc1.1`):
 
 ```text
 uncompress /mnt/mmc/grisp2.RELNAME.RELVSN.sys.gz /dev/mmc1.0
 ```
 
-Write an eMMC image or bootloader to `/dev/mmc1`:
+Write an eMMC image or a bootloader image to `/dev/mmc1`:
 
 ```text
 uncompress /mnt/mmc/grisp2.RELNAME.RELVSN.emmc.gz /dev/mmc1
@@ -209,8 +227,8 @@ uncompress /mnt/mmc/grisp2.RELNAME.RELVSN.boot.gz /dev/mmc1
 ```
 
 A truncated image contains only the first system partition. Set the active
-system to `0` before booting it. Writing a system firmware to the inactive A/B
-partition does not change what the board currently boots.
+system to `0` before booting it. Writing system firmware to the inactive A/B
+partition does not change which partition the board boots.
 
 ## Build a software update package
 
