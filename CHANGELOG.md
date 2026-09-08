@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Port the `rebar3_grisp` workflow to Mix with tasks for building custom OTP
+  systems, deploying releases, generating firmware, creating software update
+  packages, listing pre-built packages, and collecting bug reports.
+- Add `mix grisp.configure` to create GRiSP-ready Elixir projects, including
+  release, Ethernet, optional Wi-Fi, distributed Erlang, and GRiSP.io
+  configuration. Existing project files are preserved in interactive mode.
+- Add release selection, archive deployment, custom destinations, pre- and
+  post-deployment scripts, and forwarding of options to `mix release`.
+- Add support for local and Docker GRiSP toolchains, custom OTP builds, and
+  pre-built OTP package selection.
+
 ## [0.2.0] - 2024-03-21
 
 ### Added
