@@ -4,8 +4,31 @@ defmodule MixGrisp.Release do
       Process.get(:relspec)
       |> Map.fetch!(:erts)
 
-    [name] = Path.wildcard(Path.join(otp, "erts-*"))
-    name
+    pattern = Path.join(otp, "erts-*")
+
+    case Path.wildcard(pattern) do
+      [path] ->
+        path
+
+      [] ->
+        Mix.raise("""
+        No ERTS installation was found under #{otp}.
+
+        Run `mix grisp.build` before deploying or generating firmware.
+        Expected exactly one directory matching:
+
+            #{pattern}
+        """)
+
+      paths ->
+        formatted = Enum.map_join(paths, "\n", &"    #{&1}")
+
+        Mix.raise("""
+        Multiple ERTS installations were found under #{otp}; expected exactly one:
+
+        #{formatted}
+        """)
+    end
   end
 
   def init(release) do
