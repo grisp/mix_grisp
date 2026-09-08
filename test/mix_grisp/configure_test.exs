@@ -27,30 +27,40 @@ defmodule MixGrisp.ConfigureTest do
         otp_version: "29",
         jit: true,
         dest: "/tmp/grisp",
-        network: false
+        wifi: false,
+        grisp_io: false,
+        epmd: false
       )
     end)
 
     refute_received {:mix_shell, :prompt, _message}
   end
 
-  test "accepts rebar-compatible explicit boolean arguments", %{root: root} do
-    Mix.Task.reenable("grisp.configure")
-
+  test "accepts true and false as explicit jit values", %{root: root} do
     File.cd!(root, fn ->
+      Mix.Task.reenable("grisp.configure")
+
       Mix.Tasks.Grisp.Configure.run([
-        "--interactive",
-        "false",
+        "--no-interactive",
         "--name",
-        "legacy_flags",
+        "jit_enabled",
         "--jit",
-        "true",
-        "--network",
+        "true"
+      ])
+
+      Mix.Task.reenable("grisp.configure")
+
+      Mix.Tasks.Grisp.Configure.run([
+        "--no-interactive",
+        "--name",
+        "jit_disabled",
+        "--jit",
         "false"
       ])
     end)
 
-    assert File.exists?(Path.join(root, "legacy_flags/mix.exs"))
+    assert File.read!(Path.join(root, "jit_enabled/mix.exs")) =~ "jit: true"
+    assert File.read!(Path.join(root, "jit_disabled/mix.exs")) =~ "jit: false"
   end
 
   test "re-prompts until a valid application name is entered", %{root: root} do
@@ -65,7 +75,9 @@ defmodule MixGrisp.ConfigureTest do
           otp_version: "29",
           jit: true,
           dest: "/tmp/grisp",
-          network: false
+          wifi: false,
+          grisp_io: false,
+          epmd: false
         )
       end)
 
@@ -83,7 +95,9 @@ defmodule MixGrisp.ConfigureTest do
         name: "demo",
         otp_version: "29",
         jit: true,
-        dest: "/tmp/grisp"
+        dest: "/tmp/grisp",
+        grisp_io: false,
+        epmd: false
       )
     end)
 
@@ -103,7 +117,9 @@ defmodule MixGrisp.ConfigureTest do
         otp_version: "29",
         jit: true,
         dest: "/tmp/grisp",
-        network: false
+        wifi: false,
+        grisp_io: false,
+        epmd: false
       )
     end)
 
@@ -116,9 +132,7 @@ defmodule MixGrisp.ConfigureTest do
       File.cd!(root, fn ->
         MixGrisp.Configure.run(
           interactive: false,
-          name: "demo",
-          network: true,
-          wifi: false
+          name: "demo"
         )
       end)
 
@@ -132,25 +146,43 @@ defmodule MixGrisp.ConfigureTest do
     assert grisp_ini =~ "on_crash = reboot"
   end
 
-  test "generates a bootable GRiSP.io release configuration", %{root: root} do
-    result =
-      File.cd!(root, fn ->
-        MixGrisp.Configure.run(
-          interactive: false,
-          name: "connected",
-          network: true,
-          wifi: true,
-          ssid: "test-network",
-          psk: "secret",
-          grisp_io: true,
-          grisp_io_linking: true,
-          token: "link-token"
-        )
-      end)
+  test "enables Wi-Fi when either credential is supplied", %{root: root} do
+    for {name, option} <- [{"ssid_only", {:ssid, "test-network"}}, {"psk_only", {:psk, "secret"}}] do
+      result =
+        File.cd!(root, fn ->
+          MixGrisp.Configure.run([{:interactive, false}, {:name, name}, option])
+        end)
 
-    mix_exs = File.read!(Path.join(result.root, "mix.exs"))
-    config_exs = File.read!(Path.join(result.root, "config/config.exs"))
-    files = Path.join(result.root, "grisp/grisp2/common/deploy/files")
+      files = Path.join(result.root, "grisp/grisp2/common/deploy/files")
+      grisp_ini = File.read!(Path.join(files, "grisp.ini.mustache"))
+
+      assert grisp_ini =~ "wlan=enable"
+      assert grisp_ini =~ "wpa=wpa_supplicant.conf"
+      assert File.exists?(Path.join(files, "wpa_supplicant.conf"))
+    end
+  end
+
+  test "generates a bootable GRiSP.io release configuration", %{root: root} do
+    File.cd!(root, fn ->
+      Mix.Task.reenable("grisp.configure")
+
+      Mix.Tasks.Grisp.Configure.run([
+        "--no-interactive",
+        "--name",
+        "connected",
+        "--ssid",
+        "test-network",
+        "--psk",
+        "secret",
+        "--grisp-io-linking",
+        "link-token"
+      ])
+    end)
+
+    project = Path.join(root, "connected")
+    mix_exs = File.read!(Path.join(project, "mix.exs"))
+    config_exs = File.read!(Path.join(project, "config/config.exs"))
+    files = Path.join(project, "grisp/grisp2/common/deploy/files")
     grisp_ini = File.read!(Path.join(files, "grisp.ini.mustache"))
 
     for dependency <- ~w(certifi grisp_cryptoauth grisp_updater_grisp2 grisp_connect) do

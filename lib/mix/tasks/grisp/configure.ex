@@ -16,19 +16,17 @@ defmodule Mix.Tasks.Grisp.Configure do
     interactive: :boolean,
     name: :string,
     otp_version: :string,
-    jit: :boolean,
+    jit: :string,
     dest: :string,
     desc: :string,
     copyright_year: :string,
     author_name: :string,
     author_email: :string,
-    network: :boolean,
     wifi: :boolean,
     ssid: :string,
     psk: :string,
     grisp_io: :boolean,
-    grisp_io_linking: :boolean,
-    token: :string,
+    grisp_io_linking: :string,
     epmd: :boolean,
     cookie: :string
   ]
@@ -36,64 +34,36 @@ defmodule Mix.Tasks.Grisp.Configure do
   @aliases [
     i: :interactive,
     o: :otp_version,
-    j: :jit,
     d: :dest,
-    n: :network,
     w: :wifi,
     g: :grisp_io,
     l: :grisp_io_linking,
-    t: :token,
     e: :epmd,
     c: :cookie
   ]
 
-  @boolean_flags %{
-    "--interactive" => "--interactive",
-    "-i" => "--interactive",
-    "--jit" => "--jit",
-    "-j" => "--jit",
-    "--network" => "--network",
-    "-n" => "--network",
-    "--wifi" => "--wifi",
-    "-w" => "--wifi",
-    "--grisp-io" => "--grisp-io",
-    "-g" => "--grisp-io",
-    "--grisp-io-linking" => "--grisp-io-linking",
-    "-l" => "--grisp-io-linking",
-    "--epmd" => "--epmd",
-    "-e" => "--epmd"
-  }
-
   @impl Mix.Task
   def run(args) do
-    args = normalize_boolean_args(args)
     {options, []} = MixGrisp.CLI.parse!(args, @switches, @aliases)
+    options = parse_jit(options)
     result = MixGrisp.Configure.run(options)
     Enum.each(result.created, &Mix.shell().info("Created #{&1}"))
     Mix.shell().info("Configured GRiSP Mix project #{result.name}")
   end
 
-  defp normalize_boolean_args([flag, value | rest]) when is_map_key(@boolean_flags, flag) do
-    normalized = Map.fetch!(@boolean_flags, flag)
+  defp parse_jit(options) do
+    case Keyword.fetch(options, :jit) do
+      {:ok, "true"} ->
+        Keyword.put(options, :jit, true)
 
-    case value do
-      "true" ->
-        [normalized | normalize_boolean_args(rest)]
+      {:ok, "false"} ->
+        Keyword.put(options, :jit, false)
 
-      "false" ->
-        ["--no-" <> String.trim_leading(normalized, "--") | normalize_boolean_args(rest)]
+      {:ok, value} ->
+        Mix.raise("Invalid value for --jit: #{inspect(value)} (expected true or false)")
 
-      value when is_binary(value) ->
-        if String.starts_with?(value, "-") do
-          [normalized | normalize_boolean_args([value | rest])]
-        else
-          Mix.raise("Invalid boolean value: #{inspect(value)}")
-        end
+      :error ->
+        options
     end
   end
-
-  defp normalize_boolean_args([argument | rest]),
-    do: [argument | normalize_boolean_args(rest)]
-
-  defp normalize_boolean_args([]), do: []
 end

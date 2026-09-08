@@ -11,15 +11,15 @@ defmodule MixGrisp.Configure do
     copyright_year: nil,
     author_name: "Anonymous",
     author_email: "anonymous@example.org",
-    network: false,
     wifi: false,
     grisp_io: false,
-    grisp_io_linking: false,
+    grisp_io_linking: nil,
     epmd: false,
     cookie: "grisp"
   ]
 
   def run(options) do
+    options = infer_options(options)
     supplied = options |> Keyword.keys() |> MapSet.new()
 
     config =
@@ -70,25 +70,20 @@ defmodule MixGrisp.Configure do
       |> ask_unless_supplied(supplied, :otp_version, "Erlang/OTP version", &identity/1)
       |> ask_bool_unless_supplied(supplied, :jit, "Enable the Arm32 JIT patches?")
       |> ask_unless_supplied(supplied, :dest, "SD card path", &identity/1)
-      |> ask_bool_unless_supplied(supplied, :network, "Generate network configuration?")
-      |> prompt_network(supplied)
+      |> prompt_features(supplied)
     else
       config
     end
   end
 
-  defp prompt_network(config, supplied) do
-    if config[:network] do
-      config
-      |> ask_bool_unless_supplied(supplied, :wifi, "Use Wi-Fi?")
-      |> prompt_wifi(supplied)
-      |> ask_bool_unless_supplied(supplied, :grisp_io, "Enable GRiSP.io integration?")
-      |> prompt_grisp_io(supplied)
-      |> ask_bool_unless_supplied(supplied, :epmd, "Enable distributed Erlang?")
-      |> prompt_epmd(supplied)
-    else
-      config
-    end
+  defp prompt_features(config, supplied) do
+    config
+    |> ask_bool_unless_supplied(supplied, :wifi, "Use Wi-Fi?")
+    |> prompt_wifi(supplied)
+    |> ask_bool_unless_supplied(supplied, :grisp_io, "Enable GRiSP.io integration?")
+    |> prompt_grisp_io(supplied)
+    |> ask_bool_unless_supplied(supplied, :epmd, "Enable distributed Erlang?")
+    |> prompt_epmd(supplied)
   end
 
   defp prompt_wifi(config, supplied) do
@@ -103,18 +98,16 @@ defmodule MixGrisp.Configure do
 
   defp prompt_grisp_io(config, supplied) do
     if config[:grisp_io] do
-      config
-      |> ask_bool_unless_supplied(supplied, :grisp_io_linking, "Link a GRiSP2 board?")
-      |> maybe_ask_token(supplied)
+      ask_unless_supplied(
+        config,
+        supplied,
+        :grisp_io_linking,
+        "Device linking token (leave empty to skip linking)",
+        &String.trim/1
+      )
     else
       config
     end
-  end
-
-  defp maybe_ask_token(config, supplied) do
-    if config[:grisp_io_linking],
-      do: ask_unless_supplied(config, supplied, :token, "Device linking token", &String.trim/1),
-      else: config
   end
 
   defp prompt_epmd(config, supplied) do
@@ -180,38 +173,22 @@ defmodule MixGrisp.Configure do
   defp validate!(config) do
     unless valid_name?(config[:name]), do: Mix.raise(name_error())
 
-    if config[:wifi] and not config[:network], do: Mix.raise("--wifi requires --network")
-
-    if (config[:ssid] || config[:psk]) && not config[:wifi],
-      do: Mix.raise("--ssid and --psk require --wifi")
-
-    if config[:grisp_io] and not config[:network], do: Mix.raise("--grisp-io requires --network")
-
-    if config[:grisp_io_linking] and not config[:grisp_io],
+    if config[:grisp_io_linking] && not config[:grisp_io],
       do: Mix.raise("--grisp-io-linking requires --grisp-io")
-
-    if config[:token] && not config[:grisp_io_linking],
-      do: Mix.raise("--token requires --grisp-io-linking")
-
-    if config[:epmd] and not config[:network], do: Mix.raise("--epmd requires --network")
   end
 
   defp network_files(root, config, preserve?) do
-    if config[:network] do
-      base = Path.join(root, "grisp/grisp2/common/deploy/files")
-      files = [write(Path.join(base, "grisp.ini.mustache"), grisp_ini(config), preserve?)]
+    base = Path.join(root, "grisp/grisp2/common/deploy/files")
+    files = [write(Path.join(base, "grisp.ini.mustache"), grisp_ini(config), preserve?)]
 
-      files =
-        if config[:wifi],
-          do:
-            files ++
-              [write(Path.join(base, "wpa_supplicant.conf"), wpa(config), preserve?)],
-          else: files
+    files =
+      if config[:wifi],
+        do:
+          files ++
+            [write(Path.join(base, "wpa_supplicant.conf"), wpa(config), preserve?)],
+        else: files
 
-      files ++ [write(Path.join(base, "erl_inetrc"), inetrc(), preserve?)]
-    else
-      []
-    end
+    files ++ [write(Path.join(base, "erl_inetrc"), inetrc(), preserve?)]
   end
 
   defp write(path, contents, preserve?)
@@ -315,8 +292,8 @@ defmodule MixGrisp.Configure do
 
   defp app_config(config) do
     connect_config =
-      if config[:token] do
-        "config :grisp_connect,\n  device_linking_token: #{inspect(config[:token])}\n"
+      if config[:grisp_io_linking] do
+        "config :grisp_connect,\n  device_linking_token: #{inspect(config[:grisp_io_linking])}\n"
       else
         ""
       end
@@ -402,6 +379,23 @@ defmodule MixGrisp.Configure do
   end
 
   defp identity(value), do: value
+
+  defp infer_options(options) do
+    options =
+      case Keyword.fetch(options, :grisp_io_linking) do
+        {:ok, token} -> Keyword.put(options, :grisp_io_linking, String.trim(token))
+        :error -> options
+      end
+
+    options
+    |> enable_when(:wifi, Keyword.has_key?(options, :ssid) or Keyword.has_key?(options, :psk))
+    |> enable_when(:grisp_io, present?(options[:grisp_io_linking]))
+  end
+
+  defp enable_when(options, key, true), do: Keyword.put(options, key, true)
+  defp enable_when(options, _key, false), do: options
+
+  defp present?(value), do: is_binary(value) and value != ""
 
   defp valid_name?(name) when is_binary(name), do: Regex.match?(~r/^[a-z][a-z0-9_]*$/, name)
   defp valid_name?(_name), do: false
