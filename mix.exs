@@ -31,7 +31,7 @@ defmodule MixGrisp.MixProject do
 
   defp package() do
     [
-      files: ~w(lib priv .formatter.exs mix.exs README* CHANGELOG* LICENSE*),
+      files: ~w(lib .formatter.exs mix.exs README* CHANGELOG* LICENSE*),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
