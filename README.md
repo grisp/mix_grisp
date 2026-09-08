@@ -1,186 +1,359 @@
-# GRiSP Mix plug-in
+# mix_grisp
 
-Mix plug-in to build and deploy GRiSP applications for the [GRiSP board][grisp].
+Mix tooling for building, deploying, and updating Elixir applications on
+[GRiSP boards][grisp]. It provides the same GRiSP workflows as
+`rebar3_grisp`, adapted to Mix releases and Elixir configuration.
 
-## Summary
+Run `mix help grisp.TASK` for task-specific help.
 
-The package can be installed by adding `mix_grisp` to your list of dependencies
-in `mix.exs`:
+## Requirements
+
+- Elixir 1.20 or later
+- A local Erlang/OTP installation whose major version matches the target OTP
+- A GRiSP 2 board and SD card
+- A GRiSP toolchain or Docker when building OTP, eMMC images, or bootloaders
+
+## Installation
+
+Add GRiSP and this build-time plugin to `mix.exs`:
 
 ```elixir
-def deps do
+defp deps do
   [
-    {:mix_grisp, "~> 0.2.0", only: :dev}
+    {:grisp, "~> 2.12"},
+    {:mix_grisp, "~> 0.2", runtime: false}
   ]
 end
 ```
 
-## New Project Step-By-Step
+Fetch dependencies with `mix deps.get`. Print the installed plugin and library
+versions with:
 
-### Create New Project
+```console
+mix grisp.version
+```
 
-Create a project using Elixir default project template:
+## Create a new application
 
-    ```
-    $ mix new testex --module TestEx
-    $ cd testex
-    ```
+The configure task creates a supervised Mix application with release and GRiSP
+configuration, plus optional networking files:
 
-### Add Dependencies
+```console
+mix grisp.configure
+```
 
-Add the following dependencies in the project configuration `mix.exs`:
+For non-interactive use:
 
-    ```
-        defp deps do
-            [
-                ...
-                {:grisp, "~> 2.4"},
-                {:mix_grisp, "~> 0.2.0", only: :dev},
-            ]
-        end
-    ```
+```console
+mix grisp.configure --no-interactive --name my_grisp_app \
+  --ssid mywifi --psk wifipsk
+```
 
-### Configure Grisp
+Important options are `--name`, `--otp-version`, `--jit true|false`, `--dest`,
+`--wifi`, `--ssid`, `--psk`, `--grisp-io`, `--grisp-io-linking TOKEN`,
+`--epmd`, and `--cookie`.
+The JIT option uses the rebar-compatible explicit values `--jit true` and
+`--jit false`. In non-interactive mode, optional features are disabled when
+their flags are absent. Ethernet networking is always configured. Wi-Fi is
+opt-in through `--wifi` and is also enabled implicitly when either `--ssid` or
+`--psk` is supplied. Supplying `--grisp-io-linking TOKEN` also enables GRiSP.io
+integration.
 
-Add the following configuration to your project configuration `mix.exs`:
+If the target directory already exists, interactive mode asks for confirmation,
+preserves every existing file, and creates only missing files. Non-interactive
+mode refuses to configure an existing directory so scripts cannot overwrite a
+project accidentally.
 
-    ```
-        def project do
-            [
-                ...
-                grisp: grisp(),
-                releases: releases()
-            ]
-        end
+## Configure an existing application
 
-        def grisp do
-            [
-                otp: [version: "27"],
-                deploy: [
-                    # pre_script: "rm -rf /Volumes/GRISP/*",
-                    # destination: "tmp/grisp"
-                    # post_script: "diskutil unmount /Volumes/GRISP",
-                ]
-            ]
-        end
+Add GRiSP and release configuration to the project keyword list:
 
-        def releases do
-            [
-                {:myapp,
-                    [
-                        overwrite: true,
-                        cookie: "grisp",
-                        include_erts: &MixGrisp.Release.erts/0,
-                        steps: [&MixGrisp.Release.init/1, :assemble],
-                        include_executables_for: [],
-                        strip_beams: Mix.env() == :prod
-                    ]}
-                ]
-        end
-    ```
+```elixir
+def project do
+  [
+    app: :my_app,
+    version: "0.1.0",
+    elixir: "~> 1.20",
+    deps: deps(),
+    grisp: grisp(),
+    releases: releases()
+  ]
+end
 
-You can uncomment the lines in the `deploy` list after setting the proper mount
-point for your SD card if you want to deploy directly to it. The destination can be
-a normal path if you want to deploy to a local directory.
+defp grisp do
+  [
+    platform: :grisp2,
+    otp: [version: "29", jit: true],
+    deploy: [
+      destination: "/path/to/SD-card",
+      # pre_script: "rm -rf /path/to/SD-card/*",
+      # post_script: "diskutil unmount /path/to/SD-card"
+    ]
+  ]
+end
 
-Add the following boot configuration files after changing `GRISP_HOSTNAME` to
-the hostname you want the grisp board to have, `WLAN_SSID` and `WLAN_PASSWORD`
-to the ssid and password of the WiFi network the Grisp board should connect to.
+defp releases do
+  [
+    my_app: [
+      overwrite: true,
+      cookie: "replace_with_a_long_random_cookie",
+      include_erts: &MixGrisp.Release.erts/0,
+      steps: [&MixGrisp.Release.init/1, :assemble],
+      include_executables_for: [],
+      strip_beams: Mix.env() == :prod
+    ]
+  ]
+end
+```
 
-    * `grisp/grisp2/common/deploy/files/grisp.ini.mustache`
+`:platform` defaults to `:grisp2`. The configured OTP version requirement
+selects a pre-built package unless a `:build` section enables a custom build.
+Compile on the development host with the same OTP major version as the target.
 
-        ```
-        [erlang]
-        args = erl.rtems -C multi_time_warp -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib  -config {{release_name}}/releases/{{release_version}}/sys.config -s elixir start_iex -extra --no-halt
-        shell = none
+## Elixir shell and networking
 
-        [network]
-        ip_self=dhcp
-        wlan=enable
-        hostname=GRISP_HOSTNAME
-        wpa=wpa_supplicant.conf
-        ```
+Add `grisp/grisp2/common/deploy/files/grisp.ini.mustache`. Mix releases need
+the `RELEASE_LIB` boot variable. Elixir also expects native UTF-8 filename
+encoding, so `-fnu` must be passed to `erl.rtems`. To boot into IEx, use the
+Elixir user driver and `+iex`; `-s elixir start_iex` is obsolete and fails on
+current Elixir releases.
 
+```ini
+[erlang]
+args = erl.rtems -C multi_time_warp -fnu -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib -config {{release_name}}/releases/{{release_version}}/sys.config -kernel inetrc "./erl_inetrc" -user elixir -extra +iex --no-halt
+shell = none
+on_exit = reboot
+on_crash = reboot
 
-    * `grisp/grisp2/common/deploy/files/wpa_supplicant.conf`
+[network]
+ip_self=dhcp
+wlan=enable
+hostname=GRISP_HOSTNAME
+wpa=wpa_supplicant.conf
+```
 
-        ```
-        network={
-            ssid="WLAN_SSID"
-            key_mgmt=WPA-PSK
-            psk="WLAN_PASSWORD"
-        }
-        ```
+For Wi-Fi, add `wpa_supplicant.conf` beside it:
 
-### Add Configuration
+```ini
+network={
+    ssid="WLAN_SSID"
+    key_mgmt=WPA-PSK
+    psk="WLAN_PASSWORD"
+}
+```
 
-If not generated bu Mix template, add the file `config/config.exs`:
+Do not commit real credentials. See the [GRiSP networking guide][networking].
+Ethernet is always configured. For Ethernet-only networking, omit the Wi-Fi
+options; the configure task then leaves out `wlan=enable`, the `wpa` setting,
+and `wpa_supplicant.conf`.
 
-    ```
-    import Config
-    ```
+When `--grisp-io` is enabled, the generated project also includes the required
+GRiSP.io dependencies and release applications. Its Logger level is set to
+`:notice` to avoid emitting connection-level debug messages on the board.
 
-### Check OTP Version
+## Deploy a release
 
-Verify that your default erlang version matches the one configured
-(26 in the example).
+Deploy to the configured destination:
 
-This is required because the beam files are compiled locally and need to be
-compiled by the same version of the VM.
+```console
+mix grisp.deploy
+mix grisp.deploy --relname my_app --relvsn 0.1.0
+mix grisp.deploy --destination /Volumes/GRISP --force
+```
 
-### Get Dependencies
+If more than one release is configured, `--relname` is required. Use `--tar`
+to create `_grisp/deploy/grisp2.RELNAME.RELVSN.tar.gz` instead of copying to a
+destination:
 
-Get all the dependencies:
+```console
+mix grisp.deploy --tar
+```
 
-    ```
-    $ mix deps.get
-    ```
+Options are `--relname/-n`, `--relvsn/-v`, `--tar/-t`,
+`--destination/-d`, `--force/-f`, `--pre-script`, and `--post-script`.
+Options after `--` are forwarded to `mix release`:
 
-### Deploy The Project
+```console
+mix grisp.deploy --tar -- --quiet
+```
 
-To deploy, use the grisp command provided by `mix_grisp`:
+The task compiles with `GRISP=yes` and `GRISP_PLATFORM` set, resolves or reuses
+the target OTP package, creates a Mix release with the target ERTS, and applies
+all application `grisp/*/deploy` overlays.
 
-    ```
-    $ mix grisp.deploy
-    ```
+## Generate GRiSP 2 firmware
 
-### Troubleshooting
+The default command generates a system-partition firmware under
+`_grisp/firmware`:
 
-#### This BEAM file was compiled for a later version of the run-time system
+```console
+mix grisp.firmware
+```
 
-Some bema files were compiled with a newer version of OTP, delete `_build` and
-`deps`, get the fresh dependencies (`mix deps.get`), and redeploy
-(`mix grisp.deploy`).
+Available outputs are:
+
+- system firmware (`.sys.gz`), enabled by default and disabled with
+  `--no-system`;
+- an eMMC image (`.emmc.gz`) with `--image`;
+- bootloader firmware (`.boot.gz`) with `--bootloader`.
+
+Examples:
+
+```console
+mix grisp.firmware --relname my_app --relvsn 0.1.0
+mix grisp.firmware --image --bootloader --force --refresh
+mix grisp.firmware --image --no-truncate
+mix grisp.firmware --bundle path/to/release.tar.gz
+```
+
+Other options are `--[no-]compress`, `--quiet`, and all release-selection
+options. If no bundle is supplied, the task creates one through
+`grisp.deploy --tar`; `--refresh` recreates it. Image and bootloader generation
+require a toolchain.
+
+To install firmware, copy it to the GRiSP SD card, unmount the card, open the
+serial console, insert the card, reset, and interrupt barebox. Write the system
+firmware to the active partition (`/dev/mmc1.0` or `/dev/mmc1.1`):
+
+```text
+uncompress /mnt/mmc/grisp2.RELNAME.RELVSN.sys.gz /dev/mmc1.0
+```
+
+Write an eMMC image or a bootloader image to `/dev/mmc1`:
+
+```text
+uncompress /mnt/mmc/grisp2.RELNAME.RELVSN.emmc.gz /dev/mmc1
+uncompress /mnt/mmc/grisp2.RELNAME.RELVSN.boot.gz /dev/mmc1
+```
+
+A truncated image contains only the first system partition. Set the active
+system to `0` before booting it. Writing system firmware to the inactive A/B
+partition does not change which partition the board boots.
+
+## Build a software update package
+
+Create `_grisp/update/grisp2.RELNAME.RELVSN.tar`:
+
+```console
+mix grisp.pack
+mix grisp.pack --with-bootloader
+mix grisp.pack --refresh --force
+mix grisp.pack --key private_key.pem
+```
+
+The task reuses or generates firmware automatically. Options include
+`--system`, `--bootloader`, `--block-size`, `--key`, `--with-bootloader`,
+`--refresh`, `--force`, and `--quiet`. If explicit firmware is used, an
+explicit bootloader must be accompanied by an explicit system firmware.
+
+For A/B updates, include `grisp_updater_grisp2` and configure `:grisp_updater`:
+
+```elixir
+config :grisp_updater,
+  signature_check: true,
+  signature_certificates: {:priv, :my_app, "certificates/updates"},
+  system: {:grisp_updater_grisp2, %{}},
+  sources: [
+    {:grisp_updater_tarball, %{}},
+    {:grisp_updater_http, %{backend: {:grisp_updater_grisp2, %{}}}}
+  ]
+```
+
+Extract the package under `releases/RELNAME/RELVSN`, serve `releases` over
+HTTP, then update and validate from IEx:
+
+```elixir
+:grisp_updater.update("http://HOST_IP:8000/RELNAME/RELVSN")
+:grisp_updater.validate()
+```
+
+When signature checking is enabled, use `--key` and install the corresponding
+public certificate in the configured directory.
+
+## List pre-built packages
+
+```console
+mix grisp.package list
+mix grisp.package list --type toolchain
+mix grisp.package list --cached
+mix grisp.package list --columns version,hash,url
+```
+
+Use `--platform` to override the configured platform. OTP columns are
+`version`, `hash`, `name`, `size`, `etag`, `url`, and `last_modified`.
+Toolchain results also provide `os`, `os_version`, `revision`, and `latest`.
+
+## Build OTP for GRiSP
+
+Custom drivers, NIFs, and GRiSP system changes require a custom OTP build. Add
+a toolchain to the GRiSP configuration:
+
+```elixir
+defp grisp do
+  [
+    platform: :grisp2,
+    otp: [version: "29", jit: true],
+    build: [
+      toolchain: [
+        # Local installation takes precedence:
+        directory: "/PATH/TO/grisp2-rtems-toolchain/rtems/VERSION/"
+        # Or: docker: "grisp/grisp2-rtems-toolchain"
+      ]
+    ],
+    deploy: [destination: "/PATH/TO/DESTINATION"]
+  ]
+end
+```
+
+`GRISP_TOOLCHAIN` overrides the configured directory. Build with:
+
+```console
+mix grisp.build
+mix grisp.build --no-configure
+mix grisp.build --clean
+mix grisp.build --tar
+mix grisp.build --update-prebuild
+```
+
+The installation is stored under `_grisp/otp/VERSION/install`. Reconfigure
+after adding C sources; `--no-configure` can speed up rebuilds after ordinary
+source changes.
+
+## Bug reports
+
+```console
+mix grisp.report
+mix grisp.report --tar
+```
+
+Reports are written under `_grisp/report`. Review them for private information
+before sharing.
+
+## Development checkouts
+
+To test local branches, place both repositories in the consuming project's
+`_checkouts` directory:
+
+```console
+git clone https://github.com/grisp/mix_grisp.git _checkouts/mix_grisp
+git clone https://github.com/grisp/grisp_tools.git _checkouts/grisp_tools
+```
+
+Mix automatically gives checkout dependencies precedence over Hex packages.
+
+## Troubleshooting
+
+If boot fails with `cannot expand $RELEASE_LIB in bootfile`, ensure the
+`-boot_var RELEASE_LIB {{release_name}}/lib` option is present. If BEAM files
+were compiled for a later runtime, switch the development host to the target
+OTP major and rebuild:
+
+```console
+mix clean
+mix deps.clean --all --build
+mix deps.get
+mix grisp.deploy
+```
 
 [grisp]: https://www.grisp.org
-
-
-## Enabling Erlang Distribution
-
-
-1. Add the erlang epmd to your release to be able to run Erlang distribution on GRiSP
-
-   1. Add the following line in your deps, this will ship epmd without starting it at boot.
-
-      ```elixir
-      {:epmd, git: "https://github.com/erlang/epmd", ref: "4d1a59", runtime: false},
-      ```
-
-   2. Add epmd to the included applications so its modules are loaded at runtime
-  
-      ```elixir
-       def application do
-        [
-          extra_applications: [:logger],
-          included_applications: [:epmd]
-        ]
-      end
-      ```
-
-2. Read the GRiSP.ini chapter of the [wiki](https://github.com/grisp/grisp/wiki/Connecting-over-WiFI-and-Ethernet#grisp-ini)
-
-3. Your grisp.ini.mustache file `args` should terminate with the following flags, choose a nodename and cookie of your liking.
-    ```
-    ... -s elixir start_iex -kernel inetrc "./erl_inetrc" -internal_epmd epmd_sup -sname mynode -setcookie mycookie -extra --no-halt
-    ```
-
+[networking]: https://github.com/grisp/grisp/wiki/Connecting-over-WiFI-and-Ethernet#grisp-ini

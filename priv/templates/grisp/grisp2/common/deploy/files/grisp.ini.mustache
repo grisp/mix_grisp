@@ -1,0 +1,9 @@
+[erlang]
+args = erl.rtems -C multi_time_warp -fnu -- -mode embedded -home . -pa . -root {{release_name}} -bindir {{release_name}}/erts-{{erts_vsn}}/bin -boot {{release_name}}/releases/{{release_version}}/start -boot_var RELEASE_LIB {{release_name}}/lib -config {{release_name}}/releases/{{release_version}}/sys.config -kernel inetrc "./erl_inetrc"__GRISP_IO_ARGS____EPMD_ARGS__ -user elixir -extra +iex --no-halt
+shell = none
+on_exit = reboot
+on_crash = reboot
+
+[network]
+ip_self=dhcp
+__WIFI_CONFIG__hostname=GRISP_HOSTNAME

@@ -8,7 +8,7 @@ defmodule MixGrisp.MixProject do
       app: :mix_grisp,
       version: "0.2.0",
       description: "Mix plug-in for GRiSP.",
-      elixir: "~> 1.16",
+      elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
@@ -24,14 +24,14 @@ defmodule MixGrisp.MixProject do
 
   defp deps() do
     [
-      {:grisp_tools, "~> 2.8"},
+      {:grisp_tools, "~> 2.11"},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 
   defp package() do
     [
-      files: ~w(lib .formatter.exs mix.exs README* LICENSE*),
+      files: ~w(lib priv .formatter.exs mix.exs README* LICENSE*),
       licenses: ["Apache 2.0"],
       links: %{
         "GitHub" => @source_url,
