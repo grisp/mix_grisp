@@ -66,3 +66,51 @@ jobs:
 
       - name: Run tests
         run: mix test --warnings-as-errors
+
+  generated-project:
+    name: Generate and deploy a grisp_new project
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install Erlang and Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20"
+
+      - name: Restore GRiSP OTP package cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/grisp
+          key: ${{ runner.os }}-grisp2-otp-29
+
+      - name: Install Hex, Rebar, and grisp_new
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix archive.install hex grisp_new 1.0.0 --force
+
+      - name: Generate project
+        run: mix grisp.new --no-interactive --name ci_grisp_project --otp-version 29
+
+      - name: Use the checked-out mix_grisp plugin
+        run: |
+          sed -i 's|{:mix_grisp, "~> 1.0", runtime: false}|{:mix_grisp, path: "..", runtime: false}|' ci_grisp_project/mix.exs
+          grep -Fq '{:mix_grisp, path: "..", runtime: false}' ci_grisp_project/mix.exs
+
+      - name: Fetch generated project dependencies
+        working-directory: ci_grisp_project
+        run: mix deps.get
+
+      - name: Build deployment bundle
+        working-directory: ci_grisp_project
+        run: mix grisp.deploy --tar
+
+      - name: Verify deployment bundle
+        working-directory: ci_grisp_project
+        run: test -s _grisp/deploy/grisp2.ci_grisp_project.0.1.0.tar.gz
