@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-09
+
+### Added
+
+- Add end-to-end CI coverage that installs the `grisp_new` archive, creates a
+  fresh project, and builds a deployment bundle with the checked-out plugin.
+
+### Removed
+
+- Remove the `mix grisp.configure` project generator from this plugin. Install
+  the standalone `grisp_new` archive and use `mix grisp.new` instead.
+
 ## [1.0.0] - 2026-09-08
 
 ### Added
@@ -50,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix deploy for last Elixir versions and update README [\#1](https://github.com/grisp/mix_grisp/pull/1) ([sylane](https://github.com/sylane))
 
 
-[unreleased]: https://github.com/grisp/mix_grisp/compare/1.0.0...HEAD
+[unreleased]: https://github.com/grisp/mix_grisp/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/grisp/mix_grisp/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/grisp/mix_grisp/compare/0.2.0...1.0.0
 [0.2.0]: https://github.com/grisp/mix_grisp/compare/0.1.4...0.2.0
 [0.1.4]: https://github.com/grisp/mix_grisp/compare/0.1.3...0.1.4
