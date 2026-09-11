@@ -13,6 +13,7 @@ defmodule Mix.Tasks.Grisp.Report do
     %{
       project_root: to_charlist(MixGrisp.Project.root()),
       report_dir: to_charlist(report_dir),
+      project_settings: [~c"mix.exs", ~c"mix.lock"],
       flags: %{tar: Keyword.get(options, :tar, false)},
       apps: MixGrisp.Project.apps(),
       otp_version_requirement: to_charlist(MixGrisp.Config.otp_version()),
