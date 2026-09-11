@@ -134,6 +134,11 @@ jobs:
           test -s _grisp/report/mix.lock
           test -n "$(find _grisp -maxdepth 1 -name 'grisp-report_*.tar.gz' -print -quit)"
 
+      - name: Install firmware tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fusefat
+
       - name: Generate system firmware
         working-directory: ci_grisp_project
         run: mix grisp.firmware --quiet
