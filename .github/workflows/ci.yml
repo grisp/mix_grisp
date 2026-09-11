@@ -68,7 +68,7 @@ jobs:
         run: mix test --warnings-as-errors
 
   generated-project:
-    name: Generate and deploy a grisp_new project
+    name: Exercise GRiSP tasks in a grisp_new project
     runs-on: ubuntu-24.04
 
     steps:
@@ -107,6 +107,14 @@ jobs:
         working-directory: ci_grisp_project
         run: mix deps.get
 
+      - name: Print GRiSP versions
+        working-directory: ci_grisp_project
+        run: mix grisp.version
+
+      - name: List cached OTP packages
+        working-directory: ci_grisp_project
+        run: mix grisp.package list --cached
+
       - name: Build deployment bundle
         working-directory: ci_grisp_project
         run: mix grisp.deploy --tar
@@ -114,3 +122,30 @@ jobs:
       - name: Verify deployment bundle
         working-directory: ci_grisp_project
         run: test -s _grisp/deploy/grisp2.ci_grisp_project.0.1.0.tar.gz
+
+      - name: Generate a bug report
+        working-directory: ci_grisp_project
+        run: mix grisp.report --tar
+
+      - name: Verify report contents
+        working-directory: ci_grisp_project
+        run: |
+          test -s _grisp/report/mix.exs
+          test -s _grisp/report/mix.lock
+          test -n "$(find _grisp -maxdepth 1 -name 'grisp-report_*.tar.gz' -print -quit)"
+
+      - name: Generate system firmware
+        working-directory: ci_grisp_project
+        run: mix grisp.firmware --quiet
+
+      - name: Verify system firmware
+        working-directory: ci_grisp_project
+        run: test -s _grisp/firmware/grisp2.ci_grisp_project.0.1.0.sys.gz
+
+      - name: Generate an update package
+        working-directory: ci_grisp_project
+        run: mix grisp.pack --quiet
+
+      - name: Verify update package
+        working-directory: ci_grisp_project
+        run: test -s _grisp/update/grisp2.ci_grisp_project.0.1.0.tar
