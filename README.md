@@ -338,15 +338,20 @@ before sharing.
 
 ## Development checkouts
 
-To test local branches, place both repositories in the consuming project's
-`_checkouts` directory:
+To test local branches, clone both repositories where you prefer:
 
 ```console
-git clone https://github.com/grisp/mix_grisp.git _checkouts/mix_grisp
-git clone https://github.com/grisp/grisp_tools.git _checkouts/grisp_tools
+git clone https://github.com/grisp/mix_grisp.git 
+git clone https://github.com/grisp/grisp_tools.git 
 ```
 
-Mix automatically gives checkout dependencies precedence over Hex packages.
+Then change how you depend on `mix_grisp` in your project `mix.exs`.
+Add both deps as path deps and run again `mix deps.get`
+
+```elixir
+{:mix_grisp, path: "path/to/mix_grisp"},
+{:grisp_tools, path: "path/to/grisp_tools"}
+```
 
 ## Troubleshooting
 
