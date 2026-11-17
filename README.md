@@ -58,7 +58,7 @@ mix grisp.new --no-interactive --name my_grisp_app \
 
 Important options are `--name`, `--otp-version`, `--jit true|false`, `--dest`,
 `--wifi`, `--ssid`, `--psk`, `--grisp-io`, `--grisp-io-linking TOKEN`,
-`--epmd`, and `--cookie`.
+`--epmd`, `--rust`, and `--cookie`.
 The JIT option uses the rebar-compatible explicit values `--jit true` and
 `--jit false`. In non-interactive mode, optional features are disabled when
 their flags are absent. Ethernet networking is always configured. Wi-Fi is
@@ -175,6 +175,12 @@ destination:
 ```console
 mix grisp.deploy --tar
 ```
+
+By default, directory and tar deployments omit the `beam.smp` ELF. Set
+`include_debug: true` in the `deploy:` options of your project's `grisp:`
+configuration to include it for native debugging. The ELF is available in the
+local OTP installation. Remove any previously deployed `beam.smp` from an
+existing destination to reclaim its space.
 
 Options are `--relname/-n`, `--relvsn/-v`, `--tar/-t`,
 `--destination/-d`, `--force/-f`, `--pre-script`, and `--post-script`.
@@ -325,6 +331,84 @@ mix grisp.build --update-prebuild
 The installation is stored under `_grisp/otp/VERSION/install`. Reconfigure
 after adding C sources; `--no-configure` can speed up rebuilds after ordinary
 source changes.
+
+## Rust NIFs
+
+Generate a project with `mix grisp.new --rust`, or add these build-time
+dependencies to an existing application's `mix.exs`:
+
+```elixir
+{:rustler, "~> 0.38.0", runtime: false},
+{:cargo, git: "https://github.com/grisp/erlang-cargo.git", branch: "cross_build_support_0_1_3", runtime: false}
+```
+
+Rust projects use the `:grisp` Mix environment for GRiSP tasks. Add the following
+to `project/0` before returning its keyword list, so dependency NIF compilers
+also see the target environment:
+
+```elixir
+if Mix.env() == :grisp do
+  System.put_env("GRISP", "yes")
+  System.put_env("GRISP_PLATFORM", to_string(grisp()[:platform]))
+end
+```
+
+Select that environment for GRiSP commands in `mix.exs`:
+
+```elixir
+def cli do
+  [preferred_envs: ["grisp.build": :grisp, "grisp.deploy": :grisp,
+                   "grisp.firmware": :grisp, "grisp.pack": :grisp]]
+end
+```
+
+The generator includes this configuration. Target BEAM files are then separate
+from ordinary host builds. When overriding `MIX_ENV`, also set `GRISP=yes` for
+GRiSP tasks.
+
+Set `cargo_opts: [src_dir: "native"]` in `project/0`, with a Cargo workspace
+manifest at `native/Cargo.toml`. Each dependency owning NIFs supplies its own
+`:cargo_opts`; features can be selected there with `features: ["feature-name"]`.
+Keep the normal Rustler loader and skip its host compiler for GRiSP builds:
+
+```elixir
+defmodule MyApp.Native do
+  @grisp_target System.get_env("GRISP") == "yes"
+
+  use Rustler,
+    otp_app: :my_app,
+    crate: "my_app_native",
+    path: "native/my_app_native",
+    skip_compilation?: @grisp_target
+
+  @doc false
+  def __mix_recompile__?, do: (System.get_env("GRISP") == "yes") != @grisp_target
+
+  def hello, do: :erlang.nif_error(:nif_not_loaded)
+end
+```
+
+The recompilation callback keeps host and target compilation separate when
+switching between workflows. The Rust library uses `rustler::init!("Elixir.MyApp.Native")`. Its Cargo
+manifest declares Rustler `0.39.0` and `crate-type = ["cdylib", "rlib"]`.
+The Hex Rustler package supplies the Elixir compiler and loader; its version
+can differ from the Rust crate's version.
+
+Select a Rust-enabled GRiSP2 toolchain in `grisp[:build][:toolchain]`, then use
+the existing workflow:
+
+```console
+mix grisp.build
+mix grisp.deploy
+```
+
+Rust compilation and static NIF bundling use the selected SDK. Generated
+artifacts are stored under `_grisp/grisp2/rust/OTP_VERSION`. Deployment checks
+that the native inputs match the installed runtime and removes the identified
+host libraries from the assembled release. Rebuild before deploying changed
+Rust sources. Local `mix compile` uses Rustler and the host Rust toolchain.
+Rust NIFs currently require OTP 28 or later and the GRiSP2 platform.
+Applications without Cargo inputs do not require the Cargo fork or a Rust SDK.
 
 ## Bug reports
 

@@ -21,10 +21,11 @@ defmodule Mix.Tasks.Grisp.Build do
     end
 
     toolchain = toolchain!()
+    apps = MixGrisp.Rust.prepare(MixGrisp.Project.apps())
 
     spec = %{
       project_root: to_charlist(MixGrisp.Project.root()),
-      apps: MixGrisp.Project.apps(),
+      apps: apps,
       otp_version_requirement: to_charlist(MixGrisp.Config.otp_version()),
       jit: MixGrisp.Config.otp_jit(),
       platform: MixGrisp.Config.platform(),
@@ -147,6 +148,8 @@ defmodule Mix.Tasks.Grisp.Build do
 
   defp build_error({:otp_version_not_found, configured}),
     do: "Could not find an OTP version matching #{inspect(configured)}"
+
+  defp build_error({:build_inputs_stale, _} = reason), do: MixGrisp.Rust.format_error(reason)
 
   defp build_error(error), do: "Unexpected build error: #{inspect(error)}"
 end

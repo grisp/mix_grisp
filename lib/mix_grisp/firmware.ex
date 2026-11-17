@@ -50,6 +50,9 @@ defmodule MixGrisp.Firmware do
       [:firmware, :build_firmware, :create_image] ->
         MixGrisp.info("* Creating disk image...")
 
+      [:firmware, :build_firmware, :create_image, {:error, reason}] ->
+        Mix.raise("Failed to create firmware image file: #{format_reason(reason)}")
+
       [:firmware, :build_firmware, :copy_bootloader] ->
         MixGrisp.info("* Writing bootloader...")
 
@@ -145,6 +148,9 @@ defmodule MixGrisp.Firmware do
       _ -> :ok
     end
   end
+
+  defp format_reason(reason) when is_binary(reason), do: reason
+  defp format_reason(reason), do: inspect(reason)
 
   defp usage(spec) do
     files =
