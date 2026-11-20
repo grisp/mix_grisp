@@ -5,6 +5,14 @@ defmodule MixGrisp.Deploy do
 
   def run(options, release_args \\ []) do
     MixGrisp.ensure_started!()
+    apps = MixGrisp.Rust.prepare(Project.apps())
+    MixGrisp.Rust.with_target(apps, fn -> run_prepared(options, release_args, apps) end)
+  rescue
+    error in Mix.Error -> reraise(error, __STACKTRACE__)
+    error -> Mix.raise(format_error(error))
+  end
+
+  defp run_prepared(options, release_args, apps) do
     compile_for_grisp()
 
     {name, version} = Project.select_release(options[:relname], options[:relvsn])
@@ -31,10 +39,15 @@ defmodule MixGrisp.Deploy do
       otp_version_requirement: to_charlist(Config.otp_version()),
       jit: Config.otp_jit(),
       platform: Config.platform(),
-      apps: Project.apps(),
+      apps: apps,
       custom_build: Config.custom_build?(),
       distribute: distribute,
-      release: %{name: name, version: to_charlist(version), profiles: Project.profiles()},
+      release: %{
+        name: name,
+        version: to_charlist(version),
+        profiles: Project.profiles(),
+        include_debug: Config.get([:deploy, :include_debug], false) === true
+      },
       handlers: handlers
     }
     |> :grisp_tools.deploy()
@@ -43,8 +56,16 @@ defmodule MixGrisp.Deploy do
     MixGrisp.info("Deployment done")
     %{name: name, version: version, bundle: Project.bundle_file(name, version)}
   rescue
-    error in Mix.Error -> reraise(error, __STACKTRACE__)
-    error -> Mix.raise(format_error(error))
+    error in Mix.Error ->
+      reraise(error, __STACKTRACE__)
+
+    error in ErlangError ->
+      if Enum.any?(apps, fn {_app, info} -> Map.get(info, :native_nifs, []) != [] end),
+        do: Mix.raise(MixGrisp.Rust.format_error(error.original)),
+        else: Mix.raise(format_error(error))
+
+    error ->
+      Mix.raise(format_error(error))
   end
 
   def event(event, state) do
