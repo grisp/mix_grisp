@@ -24,11 +24,7 @@ defmodule MixGrisp.MixProject do
 
   defp deps() do
     [
-      # {:grisp_tools, "~> 2.11"},
-      {:grisp_tools,
-       git: "https://github.com/grisp/grisp_tools.git",
-       branch: "sylane/rust-support",
-       runtime: false},
+      {:grisp_tools, "~> 2.12", runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
