@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-25
+
+### Added
+
+- Add the Mix package release workflow (#27)
+- Add support for Rust NIFs
+
+
+### Changed
+
+- Use the Hex release of grisp_tools (#26)
+- Audit Hex dependencies in CI
+
 ## [1.1.3] - 2026-10-28
 
 ### Changed
@@ -91,7 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix deploy for last Elixir versions and update README [\#1](https://github.com/grisp/mix_grisp/pull/1) ([sylane](https://github.com/sylane))
 
 
-[Unreleased]: https://github.com/grisp/mix_grisp/compare/1.1.3...HEAD
+[Unreleased]: https://github.com/grisp/mix_grisp/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/grisp/mix_grisp/compare/1.1.3...1.2.0
 [1.1.3]: https://github.com/grisp/mix_grisp/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/grisp/mix_grisp/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/grisp/mix_grisp/compare/1.1.0...1.1.1
