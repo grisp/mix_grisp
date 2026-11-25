@@ -2,6 +2,9 @@ defmodule MixGrisp do
   @moduledoc false
 
   def ensure_started! do
+    # Mix can prune OTP paths when this plugin is a runtime: false dependency.
+    Enum.each([:ssl, :inets, :xmerl], &Mix.ensure_application!/1)
+
     case Application.ensure_all_started(:grisp_tools) do
       {:ok, _} -> :ok
       {:error, reason} -> Mix.raise("Could not start grisp_tools: #{inspect(reason)}")

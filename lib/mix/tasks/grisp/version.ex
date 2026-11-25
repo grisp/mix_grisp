@@ -5,8 +5,8 @@ defmodule Mix.Tasks.Grisp.Version do
 
   @impl Mix.Task
   def run([]) do
-    {:ok, _} = Application.ensure_all_started(:mix_grisp)
     MixGrisp.ensure_started!()
+    {:ok, _} = Application.ensure_all_started(:mix_grisp)
 
     [:mix_grisp, :grisp_tools | applications(:mix_grisp) ++ applications(:grisp_tools)]
     |> Enum.uniq()

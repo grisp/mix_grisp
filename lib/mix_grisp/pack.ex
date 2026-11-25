@@ -40,6 +40,9 @@ defmodule MixGrisp.Pack do
       [:pack, :package, :create_image] ->
         MixGrisp.info("* Creating temporary disk image...")
 
+      [:pack, :package, :create_image, {:error, reason}] ->
+        Mix.raise("Failed to create temporary disk image: #{format_reason(reason)}")
+
       [:pack, :package, :create_partitions] ->
         MixGrisp.info("* Creating disk partition table...")
 
@@ -132,6 +135,9 @@ defmodule MixGrisp.Pack do
       _ -> :ok
     end
   end
+
+  defp format_reason(reason) when is_binary(reason), do: reason
+  defp format_reason(reason), do: inspect(reason)
 
   defp charlist_or_undefined(nil), do: :undefined
   defp charlist_or_undefined(value), do: value
