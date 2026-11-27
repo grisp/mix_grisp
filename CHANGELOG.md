@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-27
+
+### Changed
+
+- Require the Rust SDK first-pull fix
+
 ## [1.2.0] - 2026-11-25
 
 ### Added
@@ -104,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix deploy for last Elixir versions and update README [\#1](https://github.com/grisp/mix_grisp/pull/1) ([sylane](https://github.com/sylane))
 
 
-[Unreleased]: https://github.com/grisp/mix_grisp/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/grisp/mix_grisp/compare/1.2.1...HEAD
+[1.2.1]: https://github.com/grisp/mix_grisp/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/grisp/mix_grisp/compare/1.1.3...1.2.0
 [1.1.3]: https://github.com/grisp/mix_grisp/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/grisp/mix_grisp/compare/1.1.1...1.1.2
